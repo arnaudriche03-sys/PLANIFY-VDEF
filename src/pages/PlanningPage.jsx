@@ -1,0 +1,638 @@
+import React, { useState } from 'react';
+import { Icons } from '../components/UI/Icons';
+
+import { useData } from '../context/DataContext';
+import { calculateWeeklyHours, detectScheduleConflict, wouldExceedMaxHours } from '../utils/calculations';
+
+const PlanningPage = () => {
+    const { currentShifts, currentDayNotes, updateShifts, updateDayNotes, updateEmployees, currentEmployees, getEmployeeColor } = useData();
+    const [planningView, setPlanningView] = useState('week'); // 'week' or 'month'
+    const [currentDate, setCurrentDate] = useState(new Date(2026, 1, 4));
+    const [showShiftModal, setShowShiftModal] = useState(false);
+    const [showAvailability, setShowAvailability] = useState(true); // Toggle for availability panel
+    const [editingShift, setEditingShift] = useState(null); // null for create, shift object for edit
+    const [shiftFormData, setShiftFormData] = useState({
+        date: '',
+        employeeId: '',
+        startTime: '09:00',
+        endTime: '17:00',
+        note: ''
+    });
+    const [validationWarnings, setValidationWarnings] = useState([]);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // ── Helper : formate une date en YYYY-MM-DD en heure LOCALE (évite le décalage UTC+1) ──
+    const toLocalDateString = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
+    // Date Helpers
+    const getWeekDates = (date) => {
+        const days = ['LUN.', 'MAR.', 'MER.', 'JEU.', 'VEN.', 'SAM.', 'DIM.'];
+        const current = new Date(date);
+        const dayOfWeek = current.getDay();
+        const diff = current.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        const monday = new Date(current.setDate(diff));
+
+        return Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            const today = new Date();
+            return {
+                name: days[i],
+                number: d.getDate(),
+                fullDate: d,
+                dateString: toLocalDateString(d),
+                isToday: d.toDateString() === today.toDateString()
+            };
+        });
+    };
+
+    const getMonthDates = (date) => {
+        const days = ['DIM.', 'LUN.', 'MAR.', 'MER.', 'JEU.', 'VEN.', 'SAM.'];
+        const year = date.getFullYear();
+        const month = date.getMonth();
+
+        const firstDay = new Date(year, month, 1);
+        const startDate = new Date(firstDay);
+        const dayOfWeek = firstDay.getDay();
+        startDate.setDate(firstDay.getDate() - dayOfWeek);
+
+        const dates = [];
+        const today = new Date();
+
+        for (let week = 0; week < 6; week++) {
+            for (let day = 0; day < 7; day++) {
+                const d = new Date(startDate);
+                d.setDate(startDate.getDate() + (week * 7) + day);
+
+                dates.push({
+                    name: days[day],
+                    number: d.getDate(),
+                    fullDate: d,
+                    dateString: toLocalDateString(d),
+                    isToday: d.toDateString() === today.toDateString(),
+                    isCurrentMonth: d.getMonth() === month
+                });
+            }
+        }
+
+        return dates;
+    };
+
+    const displayDates = planningView === 'month' ? getMonthDates(currentDate) : getWeekDates(currentDate);
+
+    // Navigation
+    const navigateWeek = (direction) => {
+        const newDate = new Date(currentDate);
+        newDate.setDate(currentDate.getDate() + (direction * 7));
+        setCurrentDate(newDate);
+    };
+
+    const navigateMonth = (direction) => {
+        const newDate = new Date(currentDate);
+        newDate.setMonth(currentDate.getMonth() + direction);
+        setCurrentDate(newDate);
+    };
+
+    // Format date range for display
+    const getDateRangeText = () => {
+        if (planningView === 'week') {
+            const weekDatesArray = getWeekDates(currentDate);
+            const start = weekDatesArray[0].fullDate;
+            const end = weekDatesArray[6].fullDate;
+            const monthNames = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+            return `Semaine du ${start.getDate()} ${monthNames[start.getMonth()]} au ${end.getDate()} ${monthNames[end.getMonth()]} ${end.getFullYear()}`;
+        } else {
+            const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+            return `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+        }
+    };
+
+    // Filter shifts for the current week
+    const weekDatesArray = getWeekDates(currentDate);
+    const weekStart = weekDatesArray[0].dateString;
+    const weekEnd = weekDatesArray[6].dateString;
+    const currentWeekShifts = currentShifts.filter(s => s.date >= weekStart && s.date <= weekEnd);
+
+    // Identify overtime employees
+    const overtimeEmployees = currentEmployees.map(emp => {
+        const hours = calculateWeeklyHours(currentWeekShifts, emp.id);
+        return { ...emp, weeklyHours: hours };
+    }).filter(emp => emp.weeklyHours > emp.maxHoursPerWeek);
+
+    // Open shift modal for creation
+    const openShiftModal = (dateString) => {
+        setEditingShift(null);
+        setShiftFormData({
+            date: dateString,
+            employeeId: currentEmployees[0]?.id || '',
+            startTime: '09:00',
+            endTime: '17:00',
+            note: ''
+        });
+        setValidationWarnings([]);
+        setShowDeleteConfirm(false);
+        setShowShiftModal(true);
+    };
+
+    // Open shift modal for editing
+    const openEditShiftModal = (shift) => {
+        setEditingShift(shift);
+        setShiftFormData({
+            date: shift.date,
+            employeeId: shift.employeeId,
+            startTime: shift.startTime,
+            endTime: shift.endTime,
+            note: shift.note || ''
+        });
+        setValidationWarnings([]);
+        setShowDeleteConfirm(false);
+        setShowShiftModal(true);
+    };
+
+    // Delete shift
+    const handleDeleteShift = () => {
+        if (editingShift) {
+            updateShifts(currentShifts.filter(s => s.id !== editingShift.id));
+            setShowShiftModal(false);
+            setEditingShift(null);
+            setShowDeleteConfirm(false);
+        }
+    };
+
+    // Validate and save shift (create or update)
+    const handleSaveShift = () => {
+        if (!shiftFormData.employeeId || !shiftFormData.date || !shiftFormData.startTime || !shiftFormData.endTime) {
+            alert('Veuillez remplir tous les champs requis');
+            return;
+        }
+
+        const warnings = [];
+        const employee = currentEmployees.find(e => e.id === parseInt(shiftFormData.employeeId));
+
+        // Check for schedule conflicts (exclude current shift if editing)
+        const shiftsToCheck = editingShift
+            ? currentWeekShifts.filter(s => s.id !== editingShift.id)
+            : currentWeekShifts;
+
+        const conflict = detectScheduleConflict(shiftsToCheck, {
+            employeeId: parseInt(shiftFormData.employeeId),
+            date: shiftFormData.date,
+            startTime: shiftFormData.startTime,
+            endTime: shiftFormData.endTime
+        });
+
+        if (conflict) {
+            warnings.push(`⚠️ Conflit d'horaire : ${employee.name} est déjà shifté de ${conflict.startTime} à ${conflict.endTime} ce jour`);
+        }
+
+        // Check for overtime (exclude current shift if editing)
+        if (employee && wouldExceedMaxHours(shiftsToCheck, employee, {
+            startTime: shiftFormData.startTime,
+            endTime: shiftFormData.endTime
+        })) {
+            const currentHours = calculateWeeklyHours(shiftsToCheck, employee.id);
+            warnings.push(`⚠️ Heures supplémentaires : ${employee.name} dépassera son quota (actuellement ${currentHours.toFixed(1)}h / ${employee.maxHoursPerWeek}h)`);
+        }
+
+        if (warnings.length > 0) {
+            setValidationWarnings(warnings);
+            return; // Show warnings, require confirmation
+        }
+
+        // Save shift (create or update)
+        if (editingShift) {
+            // Update existing shift
+            updateShifts(currentShifts.map(s =>
+                s.id === editingShift.id
+                    ? {
+                        ...s,
+                        employeeId: parseInt(shiftFormData.employeeId),
+                        date: shiftFormData.date,
+                        startTime: shiftFormData.startTime,
+                        endTime: shiftFormData.endTime,
+                        note: shiftFormData.note
+                    }
+                    : s
+            ));
+        } else {
+            // Create new shift
+            const newId = Math.max(...currentShifts.map(s => s.id), 0) + 1;
+            updateShifts([...currentShifts, {
+                id: newId,
+                employeeId: parseInt(shiftFormData.employeeId),
+                date: shiftFormData.date,
+                startTime: shiftFormData.startTime,
+                endTime: shiftFormData.endTime,
+                note: shiftFormData.note
+            }]);
+        }
+
+        setShowShiftModal(false);
+        setEditingShift(null);
+    };
+
+    // Force save despite warnings
+    const handleForceSave = () => {
+        if (editingShift) {
+            // Update existing shift
+            updateShifts(currentShifts.map(s =>
+                s.id === editingShift.id
+                    ? {
+                        ...s,
+                        employeeId: parseInt(shiftFormData.employeeId),
+                        date: shiftFormData.date,
+                        startTime: shiftFormData.startTime,
+                        endTime: shiftFormData.endTime,
+                        note: shiftFormData.note
+                    }
+                    : s
+            ));
+        } else {
+            // Create new shift
+            const newId = Math.max(...currentShifts.map(s => s.id), 0) + 1;
+            updateShifts([...currentShifts, {
+                id: newId,
+                employeeId: parseInt(shiftFormData.employeeId),
+                date: shiftFormData.date,
+                startTime: shiftFormData.startTime,
+                endTime: shiftFormData.endTime,
+                note: shiftFormData.note
+            }]);
+        }
+
+        setShowShiftModal(false);
+        setValidationWarnings([]);
+        setEditingShift(null);
+    };
+
+    // Availability view calculations
+    const employeeAvailability = currentEmployees.map(emp => {
+        const hours = calculateWeeklyHours(currentWeekShifts, emp.id);
+        const remaining = emp.maxHoursPerWeek - hours;
+        const percentage = (hours / emp.maxHoursPerWeek) * 100;
+
+        let status = 'available'; // green
+        if (percentage >= 80) status = 'limited'; // red
+        else if (percentage >= 50) status = 'moderate'; // yellow
+
+        return {
+            ...emp,
+            hoursWorked: hours,
+            hoursRemaining: remaining,
+            percentage: percentage,
+            status: status
+        };
+    }).sort((a, b) => b.hoursRemaining - a.hoursRemaining); // Sort by most available first
+
+    // Render Logic
+    return (
+        <div className="planning-wrapper">
+            {/* Controls */}
+            <div className="planning-controls">
+                <div>
+                    <h2 className="planning-title">Planning</h2>
+                    <p className="planning-subtitle">{getDateRangeText()}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <div className="view-switcher">
+                        <button className={`view-btn ${planningView === 'week' ? 'active' : ''}`} onClick={() => setPlanningView('week')}>Semaine</button>
+                        <button className={`view-btn ${planningView === 'month' ? 'active' : ''}`} onClick={() => setPlanningView('month')}>Mois</button>
+                        <button
+                            className={`view-btn ${showAvailability ? 'active' : ''}`}
+                            onClick={() => setShowAvailability(!showAvailability)}
+                        >
+                            Disponibilités {showAvailability ? '▼' : '▶'}
+                        </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            className="btn-secondary"
+                            style={{ padding: '0.5rem 1rem' }}
+                            onClick={() => planningView === 'week' ? navigateWeek(-1) : navigateMonth(-1)}
+                        >
+                            <Icons.ChevronLeft size={18} />
+                        </button>
+                        <button
+                            className="btn-secondary"
+                            style={{ padding: '0.5rem 1rem' }}
+                            onClick={() => planningView === 'week' ? navigateWeek(1) : navigateMonth(1)}
+                        >
+                            <Icons.ChevronRight size={18} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+
+            {/* Overtime Alert */}
+            {
+                overtimeEmployees.length > 0 && (
+                    <div className="conflict-alert">
+                        <div className="conflict-icon">⚠️</div>
+                        <div className="conflict-content">
+                            <div className="conflict-title">Alerte Heures Supplémentaires</div>
+                            <div className="conflict-message">
+                                {overtimeEmployees.map(emp => (
+                                    <div key={emp.id}>
+                                        <strong>{emp.name}</strong> dépassera son quota : {emp.weeklyHours.toFixed(1)}h / {emp.maxHoursPerWeek}h
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Availability Panel (collapsible) */}
+            {showAvailability && (
+                <div className="availability-panel">
+                    <div className="availability-view">
+                        {employeeAvailability.map(emp => (
+                            <div key={emp.id} className={`availability-card status-${emp.status}`}>
+                                <div className="availability-header">
+                                    <div className="availability-name">{emp.name}</div>
+                                    <div className="availability-role">{emp.role}</div>
+                                </div>
+                                <div className="availability-stats">
+                                    <div className="availability-hours">
+                                        <span className="hours-worked">{emp.hoursWorked.toFixed(1)}h</span>
+                                        <span className="hours-separator">/</span>
+                                        <span className="hours-max">{emp.maxHoursPerWeek}h</span>
+                                    </div>
+                                    <div className="availability-percentage">
+                                        {emp.percentage.toFixed(0)}%
+                                    </div>
+                                </div>
+                                <div className="availability-bar">
+                                    <div
+                                        className="availability-bar-fill"
+                                        style={{ width: `${Math.min(emp.percentage, 100)}%` }}
+                                    ></div>
+                                </div>
+                                <div className="availability-remaining">
+                                    {emp.hoursRemaining > 0
+                                        ? `${emp.hoursRemaining.toFixed(1)}h disponibles`
+                                        : `Quota dépassé de ${Math.abs(emp.hoursRemaining).toFixed(1)}h`
+                                    }
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Calendar Grid - Week or Month View */}
+            <div className={`calendar-grid ${planningView === 'month' ? 'month-view' : 'week-view'}`}>
+                {displayDates.map((date, idx) => {
+                    // Filter shifts for this day
+                    const dayShifts = currentShifts.filter(s => s.date === date.dateString).sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+                    // Calculate layout for overlaps (only for week view)
+                    const getShiftStyle = (shift) => {
+                        if (planningView === 'month') return {};
+
+                        const startHour = 7;  // Grille : 7h → 02h du matin (19h de plage restau)
+                        const endHour = 26;   // 26h = 02h AM jour suivant
+                        const totalMinutes = (endHour - startHour) * 60; // 19 * 60 = 1140
+
+                        const [startH, startM] = shift.startTime.split(':').map(Number);
+                        const [endH, endM] = shift.endTime.split(':').map(Number);
+
+                        // Normalise l'heure de fin pour les shifts après minuit (< startHour)
+                        const endHNorm = endH < startHour ? endH + 24 : endH;
+                        const startMinutes = (startH * 60 + startM) - (startHour * 60);
+                        let durationMinutes = (endHNorm * 60 + endM) - (startH * 60 + startM);
+                        if (durationMinutes <= 0) durationMinutes += 24 * 60;
+
+                        const top = (startMinutes / totalMinutes) * 100;
+                        const height = (durationMinutes / totalMinutes) * 100;
+
+                        const overlaps = dayShifts.filter(s => {
+                            if (s.id === shift.id) return true;
+                            return (s.startTime < shift.endTime && s.endTime > shift.startTime);
+                        });
+
+                        const overlapIndex = overlaps.findIndex(s => s.id === shift.id);
+                        const width = 100 / overlaps.length;
+                        const left = width * overlapIndex;
+
+                        return {
+                            top: `${Math.max(top, 0)}%`,
+                            height: `${Math.max(height, 2)}%`,
+                            left: `${left}%`,
+                            width: `${width}%`,
+                            position: 'absolute'
+                        };
+                    };
+
+                    // Détecter les shifts hors de la plage visible (avant 7h)
+                    const hiddenShifts = planningView === 'week'
+                        ? dayShifts.filter(s => {
+                            const h = parseInt((s.startTime || '0:0').split(':')[0]);
+                            return h < 7 && h >= 2; // 2h-7h non couverts
+                        })
+                        : [];
+
+                    return (
+                        <div key={idx} className={`day-column ${date.isToday ? 'today' : ''} ${planningView === 'month' && !date.isCurrentMonth ? 'day-out-of-month' : ''}`}>
+                            <div className="day-header">
+                                <div className="day-name">{date.name}</div>
+                                <div className="day-number">{date.number}</div>
+                            </div>
+
+                            <div className="day-content" style={{ position: 'relative', height: '100%', minHeight: '800px', overflow: 'visible' }}>
+                                {/* Background Grid Lines 7h-02h (only for week view) */}
+                                {planningView === 'week' && (
+                                    <div className="day-grid-lines">
+                                        {Array.from({ length: 20 }).map((_, i) => {
+                                            const hour = 7 + i; // 7h à 26h (02h AM)
+                                            const is22h = hour === 22;
+                                            const isMidnight = hour === 24;
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className="grid-line"
+                                                    style={{
+                                                        top: `${(i / 19) * 100}%`,
+                                                        borderTopColor: (is22h || isMidnight) ? 'rgba(99,102,241,0.35)' : undefined,
+                                                        borderTopWidth: (is22h || isMidnight) ? '2px' : undefined,
+                                                    }}
+                                                >
+                                                    {(is22h || isMidnight) && (
+                                                        <span style={{ fontSize: '0.6rem', color: 'rgba(99,102,241,0.6)', position: 'absolute', left: 2, top: -8 }}>
+                                                            {is22h ? '🌙22h' : '🌙 00h'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Alerte shift hors plage visible (entre 2h et 7h) */}
+                                {hiddenShifts.length > 0 && (
+                                    <div style={{
+                                        position: 'absolute', top: 0, left: 0, right: 0,
+                                        background: '#fef3c7', borderBottom: '1px solid #f59e0b',
+                                        padding: '2px 4px', fontSize: '0.65rem', color: '#92400e',
+                                        zIndex: 10, cursor: 'pointer',
+                                    }}
+                                        onClick={() => openEditShiftModal(hiddenShifts[0])}
+                                    >
+                                        ⚠️ {hiddenShifts.map(s => {
+                                            const emp = currentEmployees.find(e => e.id === s.employeeId);
+                                            return `${emp?.name} ${s.startTime}-${s.endTime}`;
+                                        }).join(', ')}
+                                    </div>
+                                )}
+
+                                {dayShifts.map(shift => {
+                                    const employee = currentEmployees.find(e => e.id === shift.employeeId);
+                                    if (!employee) return null;
+
+                                    const style = getShiftStyle(shift);
+                                    const startH = parseInt((shift.startTime || '0:0').split(':')[0]);
+                                    const isNightShift = startH < 7;
+
+                                    return (
+                                        <div
+                                            key={shift.id}
+                                            className={`shift-card ${planningView === 'week' ? 'shift-timeline' : ''}`}
+                                            style={{
+                                                borderColor: isNightShift ? '#f59e0b' : getEmployeeColor(employee.id),
+                                                backgroundColor: isNightShift ? 'rgba(245,158,11,0.15)' : `${getEmployeeColor(employee.id)}15`,
+                                                borderLeft: `4px solid ${isNightShift ? '#f59e0b' : getEmployeeColor(employee.id)}`,
+                                                ...style
+                                            }}
+                                            onClick={(e) => { e.stopPropagation(); openEditShiftModal(shift); }}
+                                        >
+                                            {isNightShift && <div style={{ fontSize: '0.65rem', color: '#d97706', fontWeight: 700 }}>🌙 NUIT</div>}
+                                            <div className="shift-name">{employee.name}</div>
+                                            <div className="shift-time">{shift.startTime} - {shift.endTime}</div>
+                                        </div>
+                                    )
+                                })}
+
+                                {/* Click to add shift at specific time (approx) */}
+                                {(planningView === 'week' || date.isCurrentMonth) && (
+                                    <div
+                                        className="day-click-area"
+                                        onClick={() => openShiftModal(date.dateString)}
+                                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}
+                                    ></div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Shift Modal */}
+            {showShiftModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <div className="modal-header">
+                            <h2 className="modal-title">{editingShift ? 'Modifier un shift' : 'Ajouter un shift'}</h2>
+                            <button className="btn-close" onClick={() => setShowShiftModal(false)}><Icons.Close /></button>
+                        </div>
+
+                        {validationWarnings.length > 0 && (
+                            <div className="warning-box">
+                                {validationWarnings.map((warning, idx) => <div key={idx}>{warning}</div>)}
+                            </div>
+                        )}
+
+                        <div className="form-group">
+                            <label className="form-label">Date</label>
+                            <input
+                                type="date"
+                                className="form-input"
+                                value={shiftFormData.date}
+                                onChange={(e) => setShiftFormData({ ...shiftFormData, date: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Employé *</label>
+                            <select
+                                className="form-select"
+                                value={shiftFormData.employeeId}
+                                onChange={(e) => setShiftFormData({ ...shiftFormData, employeeId: e.target.value })}
+                            >
+                                {currentEmployees.map(emp => (
+                                    <option key={emp.id} value={emp.id}>{emp.name} - {emp.role}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Heure de début *</label>
+                            <input
+                                type="time"
+                                className="form-input"
+                                value={shiftFormData.startTime}
+                                onChange={(e) => setShiftFormData({ ...shiftFormData, startTime: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Heure de fin *</label>
+                            <input
+                                type="time"
+                                className="form-input"
+                                value={shiftFormData.endTime}
+                                onChange={(e) => setShiftFormData({ ...shiftFormData, endTime: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Note</label>
+                            <textarea
+                                className="form-input"
+                                rows="2"
+                                value={shiftFormData.note}
+                                onChange={(e) => setShiftFormData({ ...shiftFormData, note: e.target.value })}
+                                placeholder="Note optionnelle..."
+                            />
+                        </div>
+
+                        <div className="form-actions">
+                            {editingShift && (
+                                !showDeleteConfirm ? (
+                                    <button className="btn-delete" onClick={() => setShowDeleteConfirm(true)}>
+                                        <Icons.Trash size={16} /> Supprimer
+                                    </button>
+                                ) : (
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button className="btn-danger" onClick={handleDeleteShift}>
+                                            Confirmer ?
+                                        </button>
+                                        <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)}>
+                                            Annuler
+                                        </button>
+                                    </div>
+                                )
+                            )}
+                            <button className="btn-secondary" onClick={() => setShowShiftModal(false)}>Annuler</button>
+                            {validationWarnings.length > 0 ? (
+                                <button className="btn-warning" onClick={handleForceSave}>Forcer la sauvegarde</button>
+                            ) : (
+                                <button className="btn-primary" onClick={handleSaveShift}>
+                                    {editingShift ? 'Enregistrer' : 'Créer'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+        </div >
+    );
+};
+
+export default PlanningPage;

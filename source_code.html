@@ -1,0 +1,2494 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planify - Copilote Opérationnel</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #8b5cf6;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.15);
+            --employee-color-1: #3b82f6;
+            --employee-color-2: #8b5cf6;
+            --employee-color-3: #ec4899;
+            --employee-color-4: #f59e0b;
+            --employee-color-5: #10b981;
+            --employee-color-6: #06b6d4;
+            --employee-color-7: #f97316;
+            --employee-color-8: #a855f7;
+            --employee-color-9: #14b8a6;
+            --employee-color-10: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        #root {
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .logo-text {
+            color: var(--primary);
+        }
+
+        .nav {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .nav-btn {
+            padding: 0.625rem 1.25rem;
+            border: 2px solid transparent;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-btn:hover {
+            background: var(--bg-main);
+            color: var(--text-primary);
+        }
+
+        .nav-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .restaurant-selector {
+            padding: 0.5rem 1rem;
+            border: 2px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .restaurant-selector:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .user-email {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .btn-disconnect {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .btn-disconnect:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .main-content {
+            padding: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* Équipe */
+        .team-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .team-count {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            box-shadow: var(--shadow);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .employee-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.2s;
+            box-shadow: var(--shadow);
+        }
+
+        .employee-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .employee-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .employee-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .employee-role {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .employee-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-edit {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-edit:hover {
+            background: #eff6ff;
+            color: var(--primary);
+        }
+
+        .btn-delete {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: #fee;
+            color: var(--danger);
+        }
+
+        .employee-badges {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .badge {
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .employee-info {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Planning */
+        .planning-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .planning-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .view-switcher {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--bg-main);
+            padding: 0.25rem;
+            border-radius: 8px;
+        }
+
+        .view-btn {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .view-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+
+        .view-btn:hover:not(.active) {
+            color: var(--text-primary);
+        }
+
+        .conflict-alert {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border: 2px solid var(--danger);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: start;
+            gap: 1rem;
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .conflict-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .conflict-content {
+            flex: 1;
+        }
+
+        .conflict-title {
+            font-weight: 700;
+            color: #991b1b;
+            margin-bottom: 0.25rem;
+        }
+
+        .conflict-message {
+            color: #7f1d1d;
+            font-size: 0.95rem;
+        }
+
+        .day-note-indicator {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #92400e;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .day-note-indicator:hover {
+            background: #fde68a;
+        }
+
+        .shift-note {
+            background: #dbeafe;
+            padding: 0.375rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: #1e40af;
+            margin-top: 0.25rem;
+            font-style: italic;
+        }
+
+        .week-nav {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .btn-nav {
+            padding: 0.5rem;
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            transition: all 0.2s;
+        }
+
+        .btn-nav:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .week-range {
+            font-weight: 600;
+            font-size: 1.1rem;
+            min-width: 250px;
+            text-align: center;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1rem;
+        }
+
+        .calendar-grid.month-view {
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+        }
+
+        .calendar-grid.day-view {
+            grid-template-columns: 1fr;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .day-column {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            min-height: 400px;
+            overflow: hidden;
+        }
+
+        .day-column.today {
+            border-color: var(--primary);
+        }
+
+        .day-column.month-compact {
+            min-height: 120px;
+        }
+
+        .day-column.day-expanded {
+            min-height: 600px;
+        }
+
+        .day-column.has-conflict {
+            border-color: var(--danger);
+            background: linear-gradient(135deg, #fff 0%, #fee 100%);
+        }
+
+        .day-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .day-name {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .day-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .day-shifts {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .shift-card {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 100%);
+            padding: 0.875rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #93c5fd;
+        }
+
+        .shift-card:hover {
+            transform: scale(1.02);
+            box-shadow: var(--shadow);
+        }
+
+        .shift-name {
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 0.25rem;
+        }
+
+        .shift-time {
+            font-size: 0.85rem;
+            color: #1e3a8a;
+        }
+
+        .btn-add-shift {
+            width: 100%;
+            padding: 0.75rem;
+            background: transparent;
+            border: 2px dashed var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .btn-add-shift:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #f0f9ff;
+        }
+
+        /* Pré-paie */
+        .prepaie-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .prepaie-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-card.hours {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        }
+
+        .stat-card.amount {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        }
+
+        .stat-card.status {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        }
+
+        .stat-label {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .stat-value.success {
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .table-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--bg-main);
+        }
+
+        .data-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .data-table td {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .data-table tr:hover {
+            background: var(--bg-main);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .btn-export {
+            padding: 0.875rem 1.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            margin: 1.5rem;
+            margin-left: auto;
+        }
+
+        .btn-export:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        /* Assistant IA */
+        .assistant-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .assistant-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .assistant-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .suggestions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .suggestion-btn {
+            padding: 0.75rem 1.25rem;
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .suggestion-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .chat-area {
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .chat-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .chat-placeholder {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .chat-subtext {
+            font-size: 0.95rem;
+        }
+
+        .chat-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .message {
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            background: var(--primary);
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .message.assistant {
+            background: var(--bg-main);
+            color: var(--text-primary);
+            align-self: flex-start;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn-send {
+            padding: 1rem 2rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-send:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .btn-close {
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0.5rem;
+            line-height: 1;
+        }
+
+        .btn-close:hover {
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn-secondary {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .calendar-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+
+            .nav {
+                display: none;
+            }
+
+            .calendar-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .team-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .logo-text {
+            color: white;
+        }
+
+        .nav-btn {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .nav-btn.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .restaurant-selector {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .restaurant-selector option {
+            background: var(--primary);
+        }
+
+        .user-email {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .btn-disconnect {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .restaurant-manage-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            color: white;
+            font-size: 0.9rem;
+            margin-left: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .restaurant-manage-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .employee-color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .paid-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .paid-checkbox input {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--success);
+        }
+
+        .availability-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .availability-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .availability-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .availability-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            background: var(--bg-main);
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+
+        .availability-employee {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .availability-role {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .availability-hours {
+            color: var(--success);
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .toggle-availability {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .toggle-availability:hover {
+            border-color: var(--primary);
+            background: #f0f9ff;
+        }
+
+        .toggle-availability.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .employee-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .employee-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Icônes simples en SVG
+        const Icons = {
+            Calendar: () => <span>📅</span>,
+            Users: () => <span>👥</span>,
+            Calculator: () => <span>🧮</span>,
+            Sparkles: () => <span>✨</span>,
+            Plus: () => <span>+</span>,
+            Trash: () => <span>🗑️</span>,
+            ChevronLeft: () => <span>◀</span>,
+            ChevronRight: () => <span>▶</span>,
+            Download: () => <span>⬇</span>,
+            Send: () => <span>➤</span>,
+            Close: () => <span>×</span>,
+            Check: () => <span>✓</span>,
+            Edit: () => <span>✏️</span>,
+        };
+
+        // Données initiales
+        const initialRestaurants = [
+            { id: 1, name: "La Brasserie du Centre", address: "12 rue de la Paix, Paris" },
+            { id: 2, name: "Le Bistrot des Arts", address: "45 avenue Victor Hugo, Lyon" }
+        ];
+
+        const initialEmployees = {
+            1: [ // Restaurant 1
+                {
+                    id: 1,
+                    name: "Arnaud Riché",
+                    role: "Cuisinier",
+                    contract: "CDI",
+                    level: "junior",
+                    hourlyRate: 11.65,
+                    maxHoursPerWeek: 35,
+                    phone: "06 12 34 56 78",
+                    email: "arnaud@restaurant.fr",
+                    notes: "Préfère les shifts du soir"
+                },
+                {
+                    id: 2,
+                    name: "ema",
+                    role: "Serveur",
+                    contract: "CDI",
+                    level: "confirmé",
+                    hourlyRate: 11.65,
+                    maxHoursPerWeek: 41,
+                    phone: "06 98 76 54 32",
+                    email: "ema@restaurant.fr",
+                    notes: ""
+                },
+                {
+                    id: 3,
+                    name: "jean dupont",
+                    role: "Chef de rang",
+                    contract: "CDI",
+                    level: "junior",
+                    hourlyRate: 12.00,
+                    maxHoursPerWeek: 35,
+                    phone: "06 11 22 33 44",
+                    email: "jean@restaurant.fr",
+                    notes: ""
+                },
+                {
+                    id: 4,
+                    name: "marielle",
+                    role: "Chef de rang",
+                    contract: "CDI",
+                    level: "junior",
+                    hourlyRate: 15.00,
+                    maxHoursPerWeek: 35,
+                    phone: "06 55 66 77 88",
+                    email: "marielle@restaurant.fr",
+                    notes: "Disponible uniquement en journée"
+                }
+            ],
+            2: [ // Restaurant 2
+                {
+                    id: 5,
+                    name: "Sophie Martin",
+                    role: "Chef de cuisine",
+                    contract: "CDI",
+                    level: "senior",
+                    hourlyRate: 18.00,
+                    maxHoursPerWeek: 35,
+                    phone: "06 22 33 44 55",
+                    email: "sophie@bistrot.fr",
+                    notes: ""
+                }
+            ]
+        };
+
+        const initialShifts = {
+            1: [ // Restaurant 1
+                { id: 1, employeeId: 2, date: "2026-02-02", startTime: "09:00", endTime: "17:00", note: "" },
+                { id: 2, employeeId: 3, date: "2026-02-02", startTime: "17:00", endTime: "23:00", note: "" },
+                { id: 3, employeeId: 3, date: "2026-02-03", startTime: "10:00", endTime: "23:00", note: "" },
+                { id: 4, employeeId: 4, date: "2026-02-04", startTime: "09:00", endTime: "17:00", note: "" },
+                { id: 5, employeeId: 4, date: "2026-02-05", startTime: "09:00", endTime: "17:00", note: "" },
+                { id: 6, employeeId: 4, date: "2026-02-06", startTime: "09:00", endTime: "17:00", note: "" },
+                { id: 7, employeeId: 4, date: "2026-02-07", startTime: "09:00", endTime: "17:00", note: "" }
+            ],
+            2: [] // Restaurant 2
+        };
+
+        const initialDayNotes = {
+            1: {}, // Restaurant 1
+            2: {}  // Restaurant 2
+        };
+
+        function App() {
+            const [currentTab, setCurrentTab] = useState('equipe');
+            const [currentRestaurantId, setCurrentRestaurantId] = useState(1);
+            const [restaurants, setRestaurants] = useState(initialRestaurants);
+            const [employees, setEmployees] = useState(initialEmployees);
+            const [shifts, setShifts] = useState(initialShifts);
+            const [dayNotes, setDayNotes] = useState(initialDayNotes);
+            const [showEmployeeModal, setShowEmployeeModal] = useState(false);
+            const [showShiftModal, setShowShiftModal] = useState(false);
+            const [showDayNoteModal, setShowDayNoteModal] = useState(false);
+            const [editingEmployee, setEditingEmployee] = useState(null);
+            const [editingShift, setEditingShift] = useState(null);
+            const [selectedDate, setSelectedDate] = useState(null);
+            const [chatMessages, setChatMessages] = useState([]);
+            const [isAILoading, setIsAILoading] = useState(false);
+
+            const [chatInput, setChatInput] = useState('');
+            const [planningView, setPlanningView] = useState('week'); // 'day', 'week', 'month'
+            const [currentDate, setCurrentDate] = useState(new Date(2026, 1, 4)); // 4 février 2026
+            const [prepaieView, setPrepaieView] = useState('month'); // 'week', 'month'
+            const [prepaieDate, setPrepaieDate] = useState(new Date(2026, 1, 1));
+            const [paidStatus, setPaidStatus] = useState({ 1: {}, 2: {} });
+            const [showRestaurantModal, setShowRestaurantModal] = useState(false);
+            const [editingRestaurant, setEditingRestaurant] = useState(null);
+            const [showAvailability, setShowAvailability] = useState(false);
+
+
+
+            const getEmployeeColor = (employeeId) => {
+                const colorIndex = ((employeeId - 1) % 10) + 1;
+                return `var(--employee-color-${colorIndex})`;
+            };
+
+            const updateRestaurants = (newRestaurants) => setRestaurants(newRestaurants);
+
+            const getPaidKey = (employeeId, date) => `${employeeId}-${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+            const isPaid = (employeeId, date) => paidStatus[currentRestaurantId]?.[getPaidKey(employeeId, date)] || false;
+
+            const togglePaid = (employeeId, date) => {
+                const key = getPaidKey(employeeId, date);
+                const currentStatus = paidStatus[currentRestaurantId] || {};
+                setPaidStatus({ ...paidStatus, [currentRestaurantId]: { ...currentStatus, [key]: !currentStatus[key] } });
+            };
+
+            const getAvailableEmployees = (dateString) => {
+                const dayShifts = currentShifts.filter(s => s.date === dateString);
+                return currentEmployees.map(emp => {
+                    const stats = calculateEmployeeStats(emp, 'week', currentDate);
+                    const hoursRemaining = Math.max(0, emp.maxHoursPerWeek - stats.totalHours);
+                    return { ...emp, hoursRemaining, isAvailable: hoursRemaining > 0 };
+                }).filter(emp => emp.isAvailable);
+            };
+            // ========== CLAUDE AI INTEGRATION ==========
+            const askClaude = async (question) => {
+                setIsAILoading(true);
+                try {
+                    const response = await fetch('https://orange-math-190c.arnaudriche03.workers.dev', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: question,
+                            context: {
+                                restaurant: currentRestaurant,
+                                employees: currentEmployees,
+                                shifts: currentShifts,
+                                currentDate: currentDate.toISOString()
+                            }
+                        })
+                    });
+                    const data = await response.json();
+                    setIsAILoading(false);
+
+                    if (data.content && data.content[0] && data.content[0].text) {
+                        return data.content[0].text;
+                    } else if (data.error) {
+                        return `❌ Erreur: ${data.error}`;
+                    }
+                    return "❌ Réponse invalide de l'API";
+                } catch (error) {
+                    setIsAILoading(false);
+                    return `❌ Erreur de connexion: ${error.message}`;
+                }
+            };
+
+
+
+            const currentRestaurant = restaurants.find(r => r.id === currentRestaurantId);
+            const currentEmployees = employees[currentRestaurantId] || [];
+            const currentShifts = shifts[currentRestaurantId] || [];
+            const currentDayNotes = dayNotes[currentRestaurantId] || {};
+
+            // Helpers pour gérer les restaurants
+            const updateEmployees = (newEmployees) => {
+                setEmployees({
+                    ...employees,
+                    [currentRestaurantId]: newEmployees
+                });
+            };
+
+            const updateShifts = (newShifts) => {
+                setShifts({
+                    ...shifts,
+                    [currentRestaurantId]: newShifts
+                });
+            };
+
+            const updateDayNotes = (newNotes) => {
+                setDayNotes({
+                    ...dayNotes,
+                    [currentRestaurantId]: newNotes
+                });
+            };
+
+            // Détection de conflits
+            const detectConflicts = (shift, excludeShiftId = null) => {
+                const conflictingShifts = currentShifts.filter(s => {
+                    if (s.id === excludeShiftId) return false;
+                    if (s.employeeId !== shift.employeeId) return false;
+                    if (s.date !== shift.date) return false;
+
+                    const [sStart, sEnd] = [s.startTime, s.endTime];
+                    const [nStart, nEnd] = [shift.startTime, shift.endTime];
+
+                    return (nStart < sEnd && nEnd > sStart);
+                });
+                return conflictingShifts;
+            };
+
+            // Calcul de la semaine
+            const getWeekDates = (date) => {
+                const days = ['LUN.', 'MAR.', 'MER.', 'JEU.', 'VEN.', 'SAM.', 'DIM.'];
+                const current = new Date(date);
+                const dayOfWeek = current.getDay();
+                const diff = current.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+                const monday = new Date(current.setDate(diff));
+
+                return Array.from({ length: 7 }, (_, i) => {
+                    const d = new Date(monday);
+                    d.setDate(monday.getDate() + i);
+                    const today = new Date();
+                    return {
+                        name: days[i],
+                        number: d.getDate(),
+                        fullDate: d,
+                        dateString: d.toISOString().split('T')[0],
+                        isToday: d.toDateString() === today.toDateString()
+                    };
+                });
+            };
+
+            // Calcul du mois
+            const getMonthDates = (date) => {
+                const year = date.getFullYear();
+                const month = date.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const daysInMonth = lastDay.getDate();
+
+                const dates = [];
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const d = new Date(year, month, i);
+                    dates.push({
+                        number: i,
+                        fullDate: d,
+                        dateString: d.toISOString().split('T')[0],
+                        isToday: d.toDateString() === new Date().toDateString()
+                    });
+                }
+                return dates;
+            };
+
+            const weekDates = getWeekDates(currentDate);
+            const monthDates = getMonthDates(currentDate);
+
+            // Calcul des heures et montants
+            const calculateShiftHours = (shift) => {
+                const [startHour, startMin] = shift.startTime.split(':').map(Number);
+                const [endHour, endMin] = shift.endTime.split(':').map(Number);
+                const start = startHour + startMin / 60;
+                const end = endHour + endMin / 60;
+                return end - start;
+            };
+
+            const getShiftsForPeriod = (view, date) => {
+                if (view === 'week') {
+                    const weekDates = getWeekDates(date);
+                    const startDate = weekDates[0].dateString;
+                    const endDate = weekDates[6].dateString;
+                    return currentShifts.filter(s => s.date >= startDate && s.date <= endDate);
+                } else {
+                    const year = date.getFullYear();
+                    const month = date.getMonth();
+                    const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+                    const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+                    return currentShifts.filter(s => s.date >= startDate && s.date <= endDate);
+                }
+            };
+
+            const calculateEmployeeStats = (employee, period = 'week', date = prepaieDate) => {
+                const periodShifts = getShiftsForPeriod(period, date);
+                const employeeShifts = periodShifts.filter(s => s.employeeId === employee.id);
+                const totalHours = employeeShifts.reduce((sum, shift) => sum + calculateShiftHours(shift), 0);
+                const grossPay = totalHours * employee.hourlyRate;
+                const isCompliant = totalHours <= employee.maxHoursPerWeek;
+                return { totalHours, grossPay, isCompliant };
+            };
+
+            const globalStats = currentEmployees.map(emp => calculateEmployeeStats(emp, prepaieView, prepaieDate));
+            const totalHours = globalStats.reduce((sum, stat) => sum + stat.totalHours, 0);
+            const totalGross = globalStats.reduce((sum, stat) => sum + stat.grossPay, 0);
+            const allCompliant = globalStats.every(stat => stat.isCompliant);
+
+
+            const RestaurantModal = () => {
+                if (!showRestaurantModal) return null;
+                const [formData, setFormData] = useState(editingRestaurant || { name: '', address: '' });
+
+                const handleSubmit = () => {
+                    if (!formData.name.trim()) { alert('Le nom du restaurant est requis'); return; }
+                    if (editingRestaurant) {
+                        updateRestaurants(restaurants.map(r => r.id === editingRestaurant.id ? { ...r, ...formData } : r));
+                    } else {
+                        const newId = Math.max(...restaurants.map(r => r.id), 0) + 1;
+                        updateRestaurants([...restaurants, { id: newId, ...formData }]);
+                        setEmployees({ ...employees, [newId]: [] });
+                        setShifts({ ...shifts, [newId]: [] });
+                        setDayNotes({ ...dayNotes, [newId]: {} });
+                        setPaidStatus({ ...paidStatus, [newId]: {} });
+                    }
+                    setShowRestaurantModal(false);
+                };
+
+                const handleDelete = () => {
+                    if (restaurants.length <= 1) { alert('Vous devez avoir au moins un restaurant'); return; }
+                    if (confirm(`⚠️ ATTENTION\n\nÊtes-vous sûr de vouloir supprimer "${editingRestaurant.name}" ?\n\nCette action supprimera :\n- Tous les employés\n- Tous les plannings\n- Toutes les données\n\nCette action est IRRÉVERSIBLE.`)) {
+                        const newRestaurants = restaurants.filter(r => r.id !== editingRestaurant.id);
+                        updateRestaurants(newRestaurants);
+                        if (currentRestaurantId === editingRestaurant.id) setCurrentRestaurantId(newRestaurants[0].id);
+                        setShowRestaurantModal(false);
+                    }
+                };
+
+                return (
+                    <div className="modal-overlay">
+                        <div className="modal">
+                            <div className="modal-header">
+                                <h2 className="modal-title">{editingRestaurant ? 'Modifier' : 'Nouveau'} restaurant</h2>
+                                <button className="btn-close" onClick={() => setShowRestaurantModal(false)}><Icons.Close /></button>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Nom *</label>
+                                <input type="text" className="form-input" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Adresse</label>
+                                <input type="text" className="form-input" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+                            </div>
+                            <div className="form-actions">
+                                {editingRestaurant && <button className="btn-secondary" onClick={handleDelete} style={{ background: 'var(--danger)', color: 'white' }}>Supprimer</button>}
+                                <button className="btn-secondary" onClick={() => setShowRestaurantModal(false)}>Annuler</button>
+                                <button className="btn-primary" onClick={handleSubmit}>{editingRestaurant ? 'Enregistrer' : 'Créer'}</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+
+            // Composant Header
+            const Header = () => (
+                <header className="header">
+                    <div className="logo">
+                        <div className="logo-icon"><Icons.Calendar /></div>
+                        <span className="logo-text">Planify</span>
+                    </div>
+                    <nav className="nav">
+                        <button className={`nav-btn ${currentTab === 'equipe' ? 'active' : ''}`} onClick={() => setCurrentTab('equipe')}><Icons.Users /> Équipe</button>
+                        <button className={`nav-btn ${currentTab === 'planning' ? 'active' : ''}`} onClick={() => setCurrentTab('planning')}><Icons.Calendar /> Planning</button>
+                        <button className={`nav-btn ${currentTab === 'prepaie' ? 'active' : ''}`} onClick={() => setCurrentTab('prepaie')}><Icons.Calculator /> Pré-paie</button>
+                        <button className={`nav-btn ${currentTab === 'assistant' ? 'active' : ''}`} onClick={() => setCurrentTab('assistant')}><Icons.Sparkles /> Assistant IA</button>
+                    </nav>
+                    <div className="user-section">
+                        <select className="restaurant-selector" value={currentRestaurantId} onChange={(e) => setCurrentRestaurantId(parseInt(e.target.value))}>
+                            {restaurants.map(resto => <option key={resto.id} value={resto.id}>🏪 {resto.name}</option>)}
+                        </select>
+                        <button className="restaurant-manage-btn" onClick={() => { setEditingRestaurant(currentRestaurant); setShowRestaurantModal(true); }}>✏️</button>
+                        <button className="restaurant-manage-btn" onClick={() => { setEditingRestaurant(null); setShowRestaurantModal(true); }}>+</button>
+                        <span className="user-email">arnaudriche03@gmail.com</span>
+                        <button className="btn-disconnect">🚪 Déconnexion</button>
+                    </div>
+                </header>
+            );
+
+
+
+            // Page Équipe
+            const EquipePage = () => (
+                <div>
+                    <div className="team-header">
+                        <div>
+                            <h1 className="page-title">Votre équipe</h1>
+                            <p className="team-count">{currentEmployees.length} employés enregistrés - {currentRestaurant?.name}</p>
+                        </div>
+                        <button className="btn-primary" onClick={() => {
+                            setEditingEmployee(null);
+                            setShowEmployeeModal(true);
+                        }}>
+                            <Icons.Plus /> Ajouter un employé
+                        </button>
+                    </div>
+                    <div className="team-grid">
+                        {currentEmployees.map(employee => (
+                            <div key={employee.id} className="employee-card">
+                                <div className="employee-header">
+                                    <div>
+                                        <h3 className="employee-name">{employee.name}</h3>
+                                        <p className="employee-role">{employee.role}</p>
+                                    </div>
+                                    <div className="employee-actions">
+                                        <button
+                                            className="btn-edit"
+                                            onClick={() => {
+                                                setEditingEmployee(employee);
+                                                setShowEmployeeModal(true);
+                                            }}
+                                        >
+                                            <Icons.Edit />
+                                        </button>
+                                        <button
+                                            className="btn-delete"
+                                            onClick={() => {
+                                                if (confirm(`Voulez-vous vraiment supprimer ${employee.name} ?`)) {
+                                                    updateEmployees(currentEmployees.filter(e => e.id !== employee.id));
+                                                    updateShifts(currentShifts.filter(s => s.employeeId !== employee.id));
+                                                }
+                                            }}
+                                        >
+                                            <Icons.Trash />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="employee-badges">
+                                    <span className="badge badge-success">{employee.contract}</span>
+                                    <span className="badge badge-info">{employee.level}</span>
+                                </div>
+                                <p className="employee-info">
+                                    {employee.hourlyRate.toFixed(2)}€/h • {employee.maxHoursPerWeek}h max/sem
+                                </p>
+                                {employee.phone && (
+                                    <p className="employee-info" style={{ marginTop: '0.5rem' }}>
+                                        📞 {employee.phone}
+                                    </p>
+                                )}
+                                {employee.email && (
+                                    <p className="employee-info">
+                                        ✉️ {employee.email}
+                                    </p>
+                                )}
+                                {employee.notes && (
+                                    <p className="employee-info" style={{ fontStyle: 'italic', color: 'var(--primary)' }}>
+                                        📝 {employee.notes}
+                                    </p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            // Page Planning
+            const PlanningPage = () => {
+                const formatDateRange = () => {
+                    if (planningView === 'day') {
+                        return currentDate.toLocaleDateString('fr-FR', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        });
+                    } else if (planningView === 'week') {
+                        const start = weekDates[0].fullDate;
+                        const end = weekDates[6].fullDate;
+                        return `${start.getDate()} ${start.toLocaleDateString('fr-FR', { month: 'long' })} - ${end.getDate()} ${end.toLocaleDateString('fr-FR', { month: 'long' })} ${end.getFullYear()}`;
+                    } else {
+                        return currentDate.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
+                    }
+                };
+
+                const navigateDate = (direction) => {
+                    const newDate = new Date(currentDate);
+                    if (planningView === 'day') {
+                        newDate.setDate(newDate.getDate() + direction);
+                    } else if (planningView === 'week') {
+                        newDate.setDate(newDate.getDate() + (direction * 7));
+                    } else {
+                        newDate.setMonth(newDate.getMonth() + direction);
+                    }
+                    setCurrentDate(newDate);
+                };
+
+                const allConflicts = currentShifts.filter(shift => {
+                    return detectConflicts(shift, shift.id).length > 0;
+                });
+
+                const hasConflicts = allConflicts.length > 0;
+
+                const renderDayColumn = (date, isCompact = false) => {
+                    const dayShifts = currentShifts.filter(s => s.date === date.dateString);
+                    const dayNote = currentDayNotes[date.dateString];
+                    const dayConflicts = dayShifts.filter(shift =>
+                        detectConflicts(shift, shift.id).length > 0
+                    );
+                    const hasConflict = dayConflicts.length > 0;
+
+                    return (
+                        <div
+                            key={date.dateString}
+                            className={`day-column ${date.isToday ? 'today' : ''} ${isCompact ? 'month-compact' : ''} ${hasConflict ? 'has-conflict' : ''} ${planningView === 'day' ? 'day-expanded' : ''}`}
+                        >
+                            <div className="day-header">
+                                {planningView !== 'day' && <div className="day-name">{date.name || date.fullDate.toLocaleDateString('fr-FR', { weekday: 'short' }).toUpperCase()}</div>}
+                                <div className="day-number">{date.number}</div>
+                            </div>
+                            <div className="day-shifts">
+                                {dayNote && (
+                                    <div
+                                        className="day-note-indicator"
+                                        onClick={() => {
+                                            setSelectedDate(date.dateString);
+                                            setShowDayNoteModal(true);
+                                        }}
+                                    >
+                                        📌 {dayNote}
+                                    </div>
+                                )}
+                                {dayShifts.map(shift => {
+                                    const employee = currentEmployees.find(e => e.id === shift.employeeId);
+                                    const shiftConflicts = detectConflicts(shift, shift.id);
+                                    return (
+                                        <div
+                                            key={shift.id}
+                                            className="shift-card"
+                                            style={shiftConflicts.length > 0 ? {
+                                                background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                                                borderColor: 'var(--danger)'
+                                            } : {
+                                                borderLeft: `4px solid ${getEmployeeColor(shift.employeeId)}`
+                                            }}
+                                            onClick={() => {
+                                                setEditingShift(shift);
+                                                setSelectedDate(shift.date);
+                                                setShowShiftModal(true);
+                                            }}
+                                        >
+                                            <div className="shift-name">
+                                                {employee?.name}
+                                                {shiftConflicts.length > 0 && ' ⚠️'}
+                                            </div>
+                                            <div className="shift-time">
+                                                {shift.startTime} - {shift.endTime}
+                                            </div>
+                                            {shift.note && (
+                                                <div className="shift-note">{shift.note}</div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                {!isCompact && (
+                                    <button
+                                        className="btn-add-shift"
+                                        onClick={() => {
+                                            setEditingShift(null);
+                                            setSelectedDate(date.dateString);
+                                            setShowShiftModal(true);
+                                        }}
+                                    >
+                                        <Icons.Plus />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    );
+                };
+
+                return (
+                    <div>
+                        <button className={`toggle-availability ${showAvailability ? "active" : ""}`} onClick={() => setShowAvailability(!showAvailability)}>
+                            {showAvailability ? "🙈 Masquer" : "👁️ Voir"} les disponibilités
+                        </button>
+                        {showAvailability && (
+                            <div className="availability-panel">
+                                <div className="availability-title">👥 Employés disponibles</div>
+                                <div className="availability-list">
+                                    {getAvailableEmployees(currentDate.toISOString().split('T')[0]).map(emp => (
+                                        <div key={emp.id} className="availability-item" style={{ borderLeftColor: getEmployeeColor(emp.id) }}>
+                                            <span className="employee-color-dot" style={{ backgroundColor: getEmployeeColor(emp.id) }}></span>
+                                            <span className="availability-employee">{emp.name}</span>
+                                            <span className="availability-role">{emp.role}</span>
+                                            <span className="availability-hours">{emp.hoursRemaining.toFixed(1)}h restantes</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {hasConflicts && (
+                            <div className="conflict-alert">
+                                <div className="conflict-icon">⚠️</div>
+                                <div className="conflict-content">
+                                    <div className="conflict-title">Conflit de planning détecté !</div>
+                                    <div className="conflict-message">
+                                        {allConflicts.length} shift{allConflicts.length > 1 ? 's' : ''} en conflit : un ou plusieurs employés sont staffés sur des créneaux qui se chevauchent. Cliquez sur les shifts en rouge pour les modifier.
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="planning-controls">
+                            <h2 className="planning-title">Planning de {currentRestaurant?.name}</h2>
+
+                            <div className="view-switcher">
+                                <button
+                                    className={`view-btn ${planningView === 'day' ? 'active' : ''}`}
+                                    onClick={() => setPlanningView('day')}
+                                >
+                                    Jour
+                                </button>
+                                <button
+                                    className={`view-btn ${planningView === 'week' ? 'active' : ''}`}
+                                    onClick={() => setPlanningView('week')}
+                                >
+                                    Semaine
+                                </button>
+                                <button
+                                    className={`view-btn ${planningView === 'month' ? 'active' : ''}`}
+                                    onClick={() => setPlanningView('month')}
+                                >
+                                    Mois
+                                </button>
+                            </div>
+
+                            <div className="week-nav">
+                                <button className="btn-nav" onClick={() => navigateDate(-1)}>
+                                    <Icons.ChevronLeft />
+                                </button>
+                                <span className="week-range">{formatDateRange()}</span>
+                                <button className="btn-nav" onClick={() => navigateDate(1)}>
+                                    <Icons.ChevronRight />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className={`calendar-grid ${planningView === 'month' ? 'month-view' : ''} ${planningView === 'day' ? 'day-view' : ''}`}>
+                            {planningView === 'day' && renderDayColumn({
+                                dateString: currentDate.toISOString().split('T')[0],
+                                number: currentDate.getDate(),
+                                fullDate: currentDate,
+                                isToday: currentDate.toDateString() === new Date().toDateString()
+                            })}
+
+                            {planningView === 'week' && weekDates.map(date => renderDayColumn(date))}
+
+                            {planningView === 'month' && monthDates.map(date => renderDayColumn(date, true))}
+                        </div>
+                    </div>
+                );
+            };
+
+            // Page Pré-paie
+            const PrepaiePage = () => {
+                const formatPrepaieRange = () => {
+                    if (prepaieView === 'week') {
+                        const weekDates = getWeekDates(prepaieDate);
+                        const start = weekDates[0].fullDate;
+                        const end = weekDates[6].fullDate;
+                        return `${start.getDate()} ${start.toLocaleDateString('fr-FR', { month: 'short' })} - ${end.getDate()} ${end.toLocaleDateString('fr-FR', { month: 'short' })} ${end.getFullYear()}`;
+                    } else {
+                        return prepaieDate.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
+                    }
+                };
+
+                const navigatePrepaie = (direction) => {
+                    const newDate = new Date(prepaieDate);
+                    if (prepaieView === 'week') {
+                        newDate.setDate(newDate.getDate() + (direction * 7));
+                    } else {
+                        newDate.setMonth(newDate.getMonth() + direction);
+                    }
+                    setPrepaieDate(newDate);
+                };
+                const exportPrepaieCSV = () => {
+                    const periodLabel = prepaieView === 'week' ? 'Semaine' : 'Mois';
+                    const dateRange = formatPrepaieRange();
+                    let csv = `Planify - Pré-paie ${periodLabel}\n`;
+                    csv += `Restaurant: ${currentRestaurant?.name}\n`;
+                    csv += `Période: ${dateRange}\n`;
+                    csv += `Généré le: ${new Date().toLocaleDateString('fr-FR')}\n\n`;
+                    csv += `Employé,Rôle,Contrat,Taux horaire,Heures totales,Brut estimé,Conformité,Payé\n`;
+                    currentEmployees.forEach(employee => {
+                        const stats = calculateEmployeeStats(employee, prepaieView, prepaieDate);
+                        const paid = isPaid(employee.id, prepaieDate) ? 'Oui' : 'Non';
+                        csv += `"${employee.name}","${employee.role}","${employee.contract}",${employee.hourlyRate.toFixed(2)},${stats.totalHours.toFixed(2)},${stats.grossPay.toFixed(2)},${stats.isCompliant ? 'Conforme' : 'À risque'},${paid}\n`;
+                    });
+                    csv += `\nTOTAUX,,,,"${totalHours.toFixed(2)} h","${totalGross.toFixed(2)} €",${allCompliant ? 'Conforme' : 'À risque'}\n`;
+                    csv += `\nDisclaimer: Estimation non contractuelle.\n`;
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `planify_prepaie_${dateRange.replace(/ /g, '_')}.csv`;
+                    link.click();
+                };
+
+
+                return (
+                    <div>
+                        <div className="prepaie-controls">
+                            <div>
+                                <h2 className="prepaie-title">Pré-paie</h2>
+                                <p className="page-subtitle">Calcul automatique des heures et du brut estimé - {currentRestaurant?.name}</p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                <div className="view-switcher">
+                                    <button
+                                        className={`view-btn ${prepaieView === 'week' ? 'active' : ''}`}
+                                        onClick={() => setPrepaieView('week')}
+                                    >
+                                        Semaine
+                                    </button>
+                                    <button
+                                        className={`view-btn ${prepaieView === 'month' ? 'active' : ''}`}
+                                        onClick={() => setPrepaieView('month')}
+                                    >
+                                        Mois
+                                    </button>
+                                </div>
+                                <div className="week-nav">
+                                    <button className="btn-nav" onClick={() => navigatePrepaie(-1)}>
+                                        <Icons.ChevronLeft />
+                                    </button>
+                                    <span className="week-range">{formatPrepaieRange()}</span>
+                                    <button className="btn-nav" onClick={() => navigatePrepaie(1)}>
+                                        <Icons.ChevronRight />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="stats-grid">
+                            <div className="stat-card hours">
+                                <div className="stat-label">Heures totales</div>
+                                <div className="stat-value">{totalHours.toFixed(1)}h</div>
+                            </div>
+                            <div className="stat-card amount">
+                                <div className="stat-label">Brut total estimé</div>
+                                <div className="stat-value">{totalGross.toFixed(2)}€</div>
+                            </div>
+                            <div className="stat-card status">
+                                <div className="stat-label">Conformité</div>
+                                <div className="stat-value success">
+                                    <Icons.Check /> {allCompliant ? 'OK' : 'Attention'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="table-container">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Employé</th>
+                                        <th>Rôle</th>
+                                        <th>Heures</th>
+                                        <th>Taux</th>
+                                        <th>Brut</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {currentEmployees.map(employee => {
+                                        const stats = calculateEmployeeStats(employee, prepaieView, prepaieDate);
+                                        return (
+                                            <tr key={employee.id}>
+                                                <td>{employee.name}</td>
+                                                <td>{employee.role}</td>
+                                                <td>{stats.totalHours.toFixed(1)}h</td>
+                                                <td>{employee.hourlyRate.toFixed(2)}€</td>
+                                                <td>{stats.grossPay.toFixed(2)}€</td>
+                                                <td>
+                                                    <span className="status-badge" style={stats.isCompliant ? {} : { background: '#fee2e2', color: '#991b1b' }}>
+                                                        {stats.isCompliant ? <><Icons.Check /> Conforme</> : '⚠️ Dépassé'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                            <button className="btn-export" onClick={exportPrepaieCSV}>
+                                <Icons.Download /> Exporter CSV
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Page Assistant IA
+            // Page Assistant IA avec Claude
+            const AssistantPage = () => {
+                const handleSuggestionClick = async (question) => {
+                    const userMessage = { role: 'user', content: question };
+                    setChatMessages([...chatMessages, userMessage]);
+
+                    const response = await askClaude(question);
+                    const aiMessage = { role: 'assistant', content: response };
+                    setChatMessages([...chatMessages, userMessage, aiMessage]);
+                };
+
+                const handleSendMessage = async () => {
+                    if (!chatInput.trim() || isAILoading) return;
+
+                    const userMessage = { role: 'user', content: chatInput };
+                    setChatMessages([...chatMessages, userMessage]);
+                    setChatInput('');
+
+                    const response = await askClaude(chatInput);
+                    const aiMessage = { role: 'assistant', content: response };
+                    setChatMessages([...chatMessages, userMessage, aiMessage]);
+                };
+
+                return (
+                    <div className="assistant-container">
+                        <div className="assistant-card">
+                            <div className="assistant-title">
+                                <Icons.Sparkles /> Assistant IA - Expert Code du Travail HCR
+                            </div>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                                Posez vos questions sur le planning, la conformité légale, ou l'optimisation des coûts.
+                                Propulsé par Claude AI via Cloudflare Workers.
+                            </p>
+
+                            {chatMessages.length === 0 ? (
+                                <>
+                                    <div className="suggestions">
+                                        <button
+                                            className="suggestion-btn"
+                                            onClick={() => handleSuggestionClick("Analyse mon planning actuel et dis-moi s'il est conforme au Code du travail")}
+                                        >
+                                            ⚖️ Vérifier la conformité légale
+                                        </button>
+                                        <button
+                                            className="suggestion-btn"
+                                            onClick={() => handleSuggestionClick("Quels employés ont encore des heures disponibles cette semaine ?")}
+                                        >
+                                            ⏰ Voir les disponibilités
+                                        </button>
+                                        <button
+                                            className="suggestion-btn"
+                                            onClick={() => handleSuggestionClick("Comment puis-je optimiser mes coûts de masse salariale cette semaine ?")}
+                                        >
+                                            💰 Optimiser les coûts
+                                        </button>
+                                    </div>
+                                    <div className="chat-area">
+                                        <div className="chat-icon">🤖</div>
+                                        <div className="chat-placeholder">Bienvenue dans votre assistant IA</div>
+                                        <div className="chat-subtext">
+                                            Je connais vos employés, votre planning et le Code du travail HCR français
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="chat-messages">
+                                    {chatMessages.map((msg, idx) => (
+                                        <div key={idx} className={`message ${msg.role}`}>
+                                            {msg.content}
+                                        </div>
+                                    ))}
+                                    {isAILoading && (
+                                        <div className="ai-loading">
+                                            <div className="ai-loading-spinner"></div>
+                                            Claude réfléchit...
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="input-area">
+                                <input
+                                    type="text"
+                                    className="chat-input"
+                                    placeholder="Posez votre question..."
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                    disabled={isAILoading}
+                                />
+                                <button
+                                    className="btn-send"
+                                    onClick={handleSendMessage}
+                                    disabled={isAILoading}
+                                >
+                                    <Icons.Send /> Envoyer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+
+            // Modal Employé
+            const EmployeeModal = () => {
+                const [formData, setFormData] = useState(
+                    editingEmployee ? {
+                        name: editingEmployee.name,
+                        role: editingEmployee.role,
+                        contract: editingEmployee.contract,
+                        level: editingEmployee.level,
+                        hourlyRate: editingEmployee.hourlyRate,
+                        maxHoursPerWeek: editingEmployee.maxHoursPerWeek,
+                        phone: editingEmployee.phone || '',
+                        email: editingEmployee.email || '',
+                        notes: editingEmployee.notes || ''
+                    } : {
+                        name: '',
+                        role: 'Serveur',
+                        contract: 'CDI',
+                        level: 'junior',
+                        hourlyRate: 11.65,
+                        maxHoursPerWeek: 35,
+                        phone: '',
+                        email: '',
+                        notes: ''
+                    }
+                );
+
+                const handleSubmit = () => {
+                    if (editingEmployee) {
+                        updateEmployees(currentEmployees.map(emp =>
+                            emp.id === editingEmployee.id
+                                ? {
+                                    ...emp,
+                                    ...formData,
+                                    hourlyRate: parseFloat(formData.hourlyRate),
+                                    maxHoursPerWeek: parseInt(formData.maxHoursPerWeek)
+                                }
+                                : emp
+                        ));
+                    } else {
+                        const newEmployee = {
+                            ...formData,
+                            id: Math.max(...currentEmployees.map(e => e.id), 0) + 1,
+                            hourlyRate: parseFloat(formData.hourlyRate),
+                            maxHoursPerWeek: parseInt(formData.maxHoursPerWeek)
+                        };
+                        updateEmployees([...currentEmployees, newEmployee]);
+                    }
+                    setShowEmployeeModal(false);
+                    setEditingEmployee(null);
+                };
+
+                return (
+                    <div className="modal-overlay" onClick={() => {
+                        setShowEmployeeModal(false);
+                        setEditingEmployee(null);
+                    }}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h3 className="modal-title">
+                                    {editingEmployee ? 'Modifier l\'employé' : 'Ajouter un employé'}
+                                </h3>
+                                <button className="btn-close" onClick={() => {
+                                    setShowEmployeeModal(false);
+                                    setEditingEmployee(null);
+                                }}>
+                                    <Icons.Close />
+                                </button>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Nom *</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Rôle</label>
+                                <select
+                                    className="form-select"
+                                    value={formData.role}
+                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                >
+                                    <option>Serveur</option>
+                                    <option>Cuisinier</option>
+                                    <option>Chef de rang</option>
+                                    <option>Chef de cuisine</option>
+                                    <option>Plongeur</option>
+                                    <option>Barman</option>
+                                </select>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Contrat</label>
+                                    <select
+                                        className="form-select"
+                                        value={formData.contract}
+                                        onChange={(e) => setFormData({ ...formData, contract: e.target.value })}
+                                    >
+                                        <option>CDI</option>
+                                        <option>CDD</option>
+                                        <option>Interim</option>
+                                        <option>Extra</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Niveau</label>
+                                    <select
+                                        className="form-select"
+                                        value={formData.level}
+                                        onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                                    >
+                                        <option>junior</option>
+                                        <option>confirmé</option>
+                                        <option>senior</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Taux horaire (€) *</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        className="form-input"
+                                        value={formData.hourlyRate}
+                                        onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Heures max/semaine *</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        value={formData.maxHoursPerWeek}
+                                        onChange={(e) => setFormData({ ...formData, maxHoursPerWeek: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Téléphone</label>
+                                <input
+                                    type="tel"
+                                    className="form-input"
+                                    placeholder="06 12 34 56 78"
+                                    value={formData.phone}
+                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Email</label>
+                                <input
+                                    type="email"
+                                    className="form-input"
+                                    placeholder="prenom@restaurant.fr"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Notes internes</label>
+                                <textarea
+                                    className="form-input"
+                                    placeholder="Préférences, contraintes, remarques..."
+                                    value={formData.notes}
+                                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                    rows="3"
+                                    style={{ resize: 'vertical' }}
+                                />
+                            </div>
+                            <div className="form-actions">
+                                <button className="btn-secondary" onClick={() => {
+                                    setShowEmployeeModal(false);
+                                    setEditingEmployee(null);
+                                }}>
+                                    Annuler
+                                </button>
+                                <button className="btn-primary" onClick={handleSubmit}>
+                                    {editingEmployee ? 'Modifier' : 'Ajouter'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Modal Shift
+            const ShiftModal = () => {
+                const [formData, setFormData] = useState(
+                    editingShift ? {
+                        employeeId: editingShift.employeeId,
+                        startTime: editingShift.startTime,
+                        endTime: editingShift.endTime
+                    } : {
+                        employeeId: currentEmployees[0]?.id || 1,
+                        startTime: '09:00',
+                        endTime: '17:00'
+                    }
+                );
+
+                const handleSubmit = () => {
+                    if (editingShift) {
+                        // Mode édition
+                        updateShifts(currentShifts.map(shift =>
+                            shift.id === editingShift.id
+                                ? {
+                                    ...shift,
+                                    ...formData,
+                                    employeeId: parseInt(formData.employeeId)
+                                }
+                                : shift
+                        ));
+                    } else {
+                        // Mode ajout
+                        const newShift = {
+                            ...formData,
+                            id: Math.max(...currentShifts.map(s => s.id), 0) + 1,
+                            date: selectedDate,
+                            employeeId: parseInt(formData.employeeId)
+                        };
+                        updateShifts([...currentShifts, newShift]);
+                    }
+                    setShowShiftModal(false);
+                    setEditingShift(null);
+                };
+
+                const handleDelete = () => {
+                    if (confirm('Voulez-vous vraiment supprimer ce shift ?')) {
+                        updateShifts(currentShifts.filter(s => s.id !== editingShift.id));
+                        setShowShiftModal(false);
+                        setEditingShift(null);
+                    }
+                };
+
+                return (
+                    <div className="modal-overlay" onClick={() => {
+                        setShowShiftModal(false);
+                        setEditingShift(null);
+                    }}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h3 className="modal-title">
+                                    {editingShift ? 'Modifier le shift' : 'Ajouter un shift'}
+                                </h3>
+                                <button className="btn-close" onClick={() => {
+                                    setShowShiftModal(false);
+                                    setEditingShift(null);
+                                }}>
+                                    <Icons.Close />
+                                </button>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Employé</label>
+                                <select
+                                    className="form-select"
+                                    value={formData.employeeId}
+                                    onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                                >
+                                    {currentEmployees.map(emp => (
+                                        <option key={emp.id} value={emp.id}>
+                                            {emp.name} - {emp.role}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Heure de début</label>
+                                <input
+                                    type="time"
+                                    className="form-input"
+                                    value={formData.startTime}
+                                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Heure de fin</label>
+                                <input
+                                    type="time"
+                                    className="form-input"
+                                    value={formData.endTime}
+                                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-actions">
+                                {editingShift && (
+                                    <button
+                                        className="btn-secondary"
+                                        onClick={handleDelete}
+                                        style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                                    >
+                                        <Icons.Trash /> Supprimer
+                                    </button>
+                                )}
+                                <button className="btn-secondary" onClick={() => {
+                                    setShowShiftModal(false);
+                                    setEditingShift(null);
+                                }}>
+                                    Annuler
+                                </button>
+                                <button className="btn-primary" onClick={handleSubmit}>
+                                    {editingShift ? 'Modifier' : 'Ajouter'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Modal Note de Jour
+            const DayNoteModal = () => {
+                const [noteText, setNoteText] = useState(currentDayNotes[selectedDate] || '');
+
+                const handleSave = () => {
+                    const newNotes = { ...currentDayNotes };
+                    if (noteText.trim()) {
+                        newNotes[selectedDate] = noteText.trim();
+                    } else {
+                        delete newNotes[selectedDate];
+                    }
+                    updateDayNotes(newNotes);
+                    setShowDayNoteModal(false);
+                };
+
+                return (
+                    <div className="modal-overlay" onClick={() => setShowDayNoteModal(false)}>
+                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h3 className="modal-title">Note de service</h3>
+                                <button className="btn-close" onClick={() => setShowDayNoteModal(false)}>
+                                    <Icons.Close />
+                                </button>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Note pour le {selectedDate ? new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}
+                                </label>
+                                <textarea
+                                    className="form-input"
+                                    placeholder="Consignes, informations importantes pour cette journée..."
+                                    value={noteText}
+                                    onChange={(e) => setNoteText(e.target.value)}
+                                    rows="4"
+                                    style={{ resize: 'vertical' }}
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="form-actions">
+                                <button className="btn-secondary" onClick={() => setShowDayNoteModal(false)}>
+                                    Annuler
+                                </button>
+                                <button className="btn-primary" onClick={handleSave}>
+                                    Enregistrer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <>
+                    <RestaurantModal />
+                    <Header />
+                    <main className="main-content">
+                        {currentTab === 'equipe' && <EquipePage />}
+                        {currentTab === 'planning' && <PlanningPage />}
+                        {currentTab === 'prepaie' && <PrepaiePage />}
+                        {currentTab === 'assistant' && <AssistantPage />}
+                    </main>
+                    {showEmployeeModal && <EmployeeModal />}
+                    {showShiftModal && <ShiftModal />}
+                    {showDayNoteModal && <DayNoteModal />}
+                </>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+
+</html>
