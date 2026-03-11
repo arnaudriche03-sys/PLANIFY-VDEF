@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
-import { Icons } from '../UI/Icons';
+import { X, Trash2 } from 'lucide-react';
 
 const RestaurantModal = ({ onClose, mode }) => {
     const {
@@ -64,7 +64,7 @@ const RestaurantModal = ({ onClose, mode }) => {
             <div className="modal-content" style={{ maxWidth: '500px' }}>
                 <div className="modal-header">
                     <h2>{isEdit ? 'Modifier le Restaurant' : 'Ajouter un Restaurant'}</h2>
-                    <button className="close-btn" onClick={onClose}><Icons.Close size={20} /></button>
+                    <button className="close-btn" onClick={onClose}><X size={20} /></button>
                 </div>
 
                 <div className="modal-body">
@@ -98,7 +98,7 @@ const RestaurantModal = ({ onClose, mode }) => {
                                 onClick={() => setShowDeleteConfirm(true)}
                                 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                             >
-                                <Icons.Trash size={16} /> Supprimer
+                                <Trash2 size={16} /> Supprimer
                             </button>
                         ) : (
                             <div style={{ display: 'flex', gap: '8px' }}>

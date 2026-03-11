@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { SYSTEM_PROMPT } from '../constants/prompts';
-import { splitShiftHours } from '../utils/calculations';
+import { splitShiftHours, calculatePerformanceMetrics } from '../utils/calculations';
+
 
 // Parse la réponse de l'IA et extrait le bloc PLANNING_PROPOSAL s'il existe
 const parseAIResponse = (rawText) => {
@@ -218,7 +219,7 @@ export const useClaude = () => {
                 periode: planningPeriod,
                 avertissement: isSameWeek
                     ? 'Planning = semaine actuelle.'
-                    : `⚠️ Le planning chargé (${planningPeriod}) N'EST PAS la semaine actuelle (${semaineCourante}). Utilise "la semaine du ${planningStart}" et non "cette semaine".`,
+                    : `[Avertissement] Le planning chargé (${planningPeriod}) N'EST PAS la semaine actuelle (${semaineCourante}). Utilise "la semaine du ${planningStart}" et non "cette semaine".`,
             },
             restaurant: currentRestaurant,
             resume_planning: {
@@ -227,8 +228,8 @@ export const useClaude = () => {
                 total_heures_nuit_22h_7h: Math.round(Object.values(heuresNuitParEmploye).reduce((a, b) => a + b, 0) * 10) / 10,
                 total_heures_dimanche: Math.round(Object.values(heuresDimParEmploye).reduce((a, b) => a + b, 0) * 10) / 10,
                 alerte_majorations: [
-                    ...(aNuitCeSemaine ? ['🌙 Des heures de nuit (22h-7h) sont planifiées → majoration +10% CCN HCR appliquée dans les coûts'] : []),
-                    ...(aDimancheCeSemaine ? ['☀️ Des heures du dimanche sont planifiées → majoration +10% CCN HCR appliquée dans les coûts'] : []),
+                    ...(aNuitCeSemaine ? ['Heures de nuit (22h-7h) planifiées : majoration +10% appliquée'] : []),
+                    ...(aDimancheCeSemaine ? ['Heures du dimanche planifiées : majoration +10% appliquée'] : []),
                 ],
                 cout_total_charge_estime: coutTotalSemaine > 0 ? `${coutTotalSemaine}€ (majorations nuit/dim. incluses)` : 'non calculable (taux manquants)',
                 note_rmo: 'CA non fourni — RMO non calculable. Demandez le CA pour obtenir le ratio.',
@@ -237,7 +238,7 @@ export const useClaude = () => {
             planning_detaille: shiftsEnrichis,
             rapport_conformite_hcr: {
                 nb_violations: violations.length,
-                statut: violations.length === 0 ? '✅ Aucune violation détectée' : `⚠️ ${violations.length} violation(s) détectée(s)`,
+                statut: violations.length === 0 ? 'Conformité validée' : `${violations.length} violation(s) détectée(s)`,
                 violations,
             },
             kpis_economiques: (() => {
@@ -246,7 +247,7 @@ export const useClaude = () => {
                 if (!caEntry || !caEntry.caPrevisionnel) {
                     return {
                         ca_disponible: false,
-                        message: 'CA non renseigné pour cette semaine. Utilisez le bouton "📊 Renseigner les KPIs" pour saisir le CA prévisionnel.',
+                        message: 'CA non renseigné pour cette semaine. Utilisez le panneau de performance pour saisir le CA prévisionnel.',
                     };
                 }
                 const ca = parseFloat(caEntry.caPrevisionnel);
@@ -259,7 +260,7 @@ export const useClaude = () => {
                     nb_couverts: caEntry.nbCouverts || 'non renseigné',
                     cout_total_charge: coutTotalSemaine > 0 ? `${coutTotalSemaine}€` : 'non calculable',
                     rmo: rmo !== null ? `${rmo}%` : 'non calculable',
-                    alerte_rmo: rmo !== null && rmo > 35 ? `🔴 RMO à ${rmo}% > seuil d'alerte 35%${rmo > 45 ? ' — CRITIQUE > 45%' : ''}` : '✅ RMO dans les limites',
+                    alerte_rmo: rmo !== null && rmo > 35 ? `[ALERTE] RMO à ${rmo}% > seuil d'alerte 35%${rmo > 45 ? ' [CRITIQUE]' : ''}` : '[OK] RMO dans les limites',
                     productivite_horaire: productiviteHoraire !== null ? `${productiviteHoraire}€/h` : 'non calculable',
                 };
             })(),
@@ -273,7 +274,7 @@ export const useClaude = () => {
 
         if (!apiKey) {
             setIsAILoading(false);
-            return { text: "⚠️ Clé API manquante. Veuillez ajouter VITE_ANTHROPIC_API_KEY dans le fichier .env", proposal: null };
+            return { text: "[Erreur] Clé API manquante. Veuillez configurer VITE_ANTHROPIC_API_KEY.", proposal: null };
         }
 
         try {
@@ -324,7 +325,7 @@ ${JSON.stringify(contextData, null, 2)}
             if (data.content && data.content[0] && data.content[0].text) {
                 return parseAIResponse(data.content[0].text);
             }
-            return { text: "❌ Réponse vide de l'IA", proposal: null };
+            return { text: "[Erreur] Réponse vide de l'IA", proposal: null };
 
         } catch (error) {
             console.error("Claude Hook Error:", error);
@@ -333,5 +334,178 @@ ${JSON.stringify(contextData, null, 2)}
         }
     };
 
-    return { askClaude, isAILoading };
+    // ── Audit Stratégique ────────────────────────────────────────────────────
+    const runStrategicAudit = async (forcedWeekStart = null, viewType = 'week') => {
+        setIsAILoading(true);
+        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
+        // ── Helpers date (audit) ─────────────────────────────────────────────
+        const auditGetMondayOf = (iso) => {
+            const d = new Date(iso);
+            const day = d.getDay();
+            const diff = day === 0 ? -6 : 1 - day;
+            d.setDate(d.getDate() + diff);
+            return d.toISOString().split('T')[0];
+        };
+
+        const auditAddDays = (iso, n) => {
+            const d = new Date(iso);
+            d.setDate(d.getDate() + n);
+            return d.toISOString().split('T')[0];
+        };
+
+        // ── Sélection de la période de référence ─────────────────────────────
+        const todayIso = new Date().toISOString().split('T')[0];
+        const currentWeekStart = auditGetMondayOf(todayIso);
+        let weekStart;
+
+        if (forcedWeekStart) {
+            weekStart = forcedWeekStart;
+        } else {
+            const revenueKeys = Object.keys(currentRevenueData || {});
+            weekStart = currentWeekStart;
+            let bestDiff = Infinity;
+            for (const key of revenueKeys) {
+                const entry = currentRevenueData[key];
+                if (entry?.caPrevisionnel) {
+                    const diff = Math.abs(new Date(key) - new Date(currentWeekStart));
+                    if (diff < bestDiff) { bestDiff = diff; weekStart = key; }
+                }
+            }
+        }
+
+        // ── Définition des bornes de la période ───────────────────────────────
+        let periodStart, periodEnd, prevPeriodStart, prevPeriodEnd;
+
+        if (viewType === 'month') {
+            const d = new Date(weekStart);
+            periodStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+            periodEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+            prevPeriodStart = new Date(d.getFullYear(), d.getMonth() - 1, 1).toISOString().split('T')[0];
+            prevPeriodEnd = new Date(d.getFullYear(), d.getMonth(), 0).toISOString().split('T')[0];
+        } else {
+            periodStart = weekStart;
+            periodEnd = auditAddDays(weekStart, 6);
+            prevPeriodStart = auditAddDays(weekStart, -7);
+            prevPeriodEnd = auditAddDays(weekStart, -1);
+        }
+
+        // ── Filtrer les shifts par période ───────────────────────────────────
+        let shiftsCurrentPeriod = currentShifts.filter(s => s.date >= periodStart && s.date <= periodEnd);
+        const shiftsPrevPeriod = currentShifts.filter(s => s.date >= prevPeriodStart && s.date <= prevPeriodEnd);
+
+        // Si aucun shift pour la période (et qu'on est en vue semaine) → fallback comme avant
+        if (viewType === 'week' && shiftsCurrentPeriod.length === 0) {
+            const shiftWeeks = [...new Set(currentShifts.map(s => s.date ? auditGetMondayOf(s.date) : null).filter(Boolean))];
+            let closestWeek = weekStart;
+            let closestDiff = Infinity;
+            for (const sw of shiftWeeks) {
+                const d = Math.abs(new Date(sw) - new Date(weekStart));
+                if (d < closestDiff) { closestDiff = d; closestWeek = sw; }
+            }
+            const closestEnd = auditAddDays(closestWeek, 6);
+            shiftsCurrentPeriod = currentShifts.filter(s => s.date >= closestWeek && s.date <= closestEnd);
+        }
+
+        // ── Agrégation du Revenue ───────────────────────────────────────────
+        const aggregateRevenue = (start, end) => {
+            let totalCA = 0;
+            let totalCouverts = 0;
+            let hasData = false;
+
+            Object.keys(currentRevenueData || {}).forEach(key => {
+                if (key >= start && key <= end) {
+                    const entry = currentRevenueData[key];
+                    if (entry.caPrevisionnel || entry.nbCouvertsPrevus) {
+                        totalCA += Number(entry.caPrevisionnel || 0);
+                        totalCouverts += Number(entry.nbCouvertsPrevus || 0);
+                        hasData = true;
+                    }
+                }
+            });
+
+            return hasData ? { caPrevisionnel: totalCA, nbCouvertsPrevus: totalCouverts } : null;
+        };
+
+        const revCurrent = viewType === 'month'
+            ? aggregateRevenue(periodStart, periodEnd)
+            : currentRevenueData[weekStart] || null;
+
+        const revPrev = viewType === 'month'
+            ? aggregateRevenue(prevPeriodStart, prevPeriodEnd)
+            : currentRevenueData[prevWeekStart] || null;
+
+        const metrics = calculatePerformanceMetrics(shiftsCurrentPeriod, currentEmployees, revCurrent);
+        const prevMetrics = calculatePerformanceMetrics(shiftsPrevPeriod, currentEmployees, revPrev);
+
+        // Stocker la période réelle pour l'UI
+        metrics.weekStart = periodStart;
+        metrics.viewType = viewType;
+
+
+
+        // ── Prompt d'audit dédié ─────────────────────────────────────────────
+        const fmt = (v, unit) => v !== null ? `${v}${unit}` : 'N/D (CA non renseigné)';
+        const delta = (cur, prev, unit) => {
+            if (cur === null || prev === null) return 'N/D';
+            const d = Math.round((cur - prev) * 10) / 10;
+            return `${d > 0 ? '+' : ''}${d}${unit} vs S-1`;
+        };
+
+        const auditPrompt = `Tu es un moteur d'analyse financière RH pour restaurateur professionnel.
+Analyse les KPI ci-dessous et produis un rapport structuré en 3 sections au maximum.
+
+DONNÉES — ${viewType === 'month' ? 'Mois complet' : 'Semaine'} du ${periodStart} au ${periodEnd} :
+- Ratio Masse Salariale : ${fmt(metrics.ratioMasseSalariale, '%')} (${delta(metrics.ratioMasseSalariale, prevMetrics.ratioMasseSalariale, 'pts')}) [seuil sain < 35%, critique > 45%]
+- Productivité Horaire : ${fmt(metrics.productiviteHoraire, '€/h')} (${delta(metrics.productiviteHoraire, prevMetrics.productiviteHoraire, '€/h')}) [seuil sain > 80€/h]
+- Ticket Moyen : ${fmt(metrics.ticketMoyen, '€')} (${delta(metrics.ticketMoyen, prevMetrics.ticketMoyen, '€')}) [seuil sain > 25€]
+- Heures planifiées : ${metrics.totalHeures}h | Coût chargé : ${metrics.coutChargeTotal > 0 ? metrics.coutChargeTotal + '€' : 'N/D'} | CA : ${metrics.ca ? metrics.ca + '€' : 'Non renseigné'}
+
+FORMAT REQUIS :
+### Diagnostic
+[2-3 lignes factuelles sur les ratios du ${viewType === 'month' ? 'mois' : 'la semaine'}, sans reformuler les chiffres bruts — donner le contexte et la signification]
+
+### Écart critique
+[Uniquement si un indicateur dépasse un seuil. Sinon, écrire "Aucun écart critique détecté."]
+
+### Action corrective
+[1 action précise et immédiatement actionnable¹. Si tous les KPI sont OK, proposer un levier d'optimisation proactif]
+
+¹ Pour une vue Mensuelle, focus sur la structure de coût ou le recrutement. Pour une vue Hebdo, focus sur l'ajustement immédiat des shifts.
+
+CONTRAINTES ABSOLUES : Aucun emoji. Ton factuel et direct. Pas de phrases d'introduction ou de conclusion. Réponse < 200 mots. Police de ton : Vercel, analytique.`;
+
+        if (!apiKey) {
+            setIsAILoading(false);
+            return { metrics, prevMetrics, analysisText: 'Clé API manquante. Configurez VITE_ANTHROPIC_API_KEY.' };
+        }
+
+        try {
+            const response = await fetch('/api/anthropic/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true'
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-haiku-20240307',
+                    max_tokens: 512,
+                    messages: [{ role: 'user', content: auditPrompt }],
+                })
+            });
+
+            if (!response.ok) throw new Error(`Erreur API: ${response.status}`);
+            const data = await response.json();
+            setIsAILoading(false);
+            const analysisText = data.content?.[0]?.text?.trim() || 'Analyse non disponible.';
+            return { metrics, prevMetrics, analysisText };
+        } catch (error) {
+            setIsAILoading(false);
+            return { metrics, prevMetrics, analysisText: `Erreur lors de l'analyse: ${error.message}` };
+        }
+    };
+
+    return { askClaude, isAILoading, runStrategicAudit };
 };

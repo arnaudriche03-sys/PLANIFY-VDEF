@@ -1,9 +1,10 @@
 import React from 'react';
+import { FileText, CheckCircle2, XCircle, PlusCircle, MinusCircle, RefreshCw } from 'lucide-react';
 
 const TYPE_LABELS = {
-    add: { label: 'Ajout', emoji: '🟢', className: 'change-add' },
-    remove: { label: 'Suppression', emoji: '🔴', className: 'change-remove' },
-    modify: { label: 'Modification', emoji: '🟡', className: 'change-modify' },
+    add: { label: 'Ajout', icon: <PlusCircle size={14} color="#10b981" />, className: 'change-add' },
+    remove: { label: 'Suppression', icon: <MinusCircle size={14} color="#ef4444" />, className: 'change-remove' },
+    modify: { label: 'Modification', icon: <RefreshCw size={14} color="#f59e0b" />, className: 'change-modify' },
 };
 
 const calcDuration = (start, end) => {
@@ -29,7 +30,7 @@ const ChangeRow = ({ change }) => {
     return (
         <div className={`change-row ${type.className}`}>
             <span className="change-badge">
-                {type.emoji} {type.label}
+                {type.icon} {type.label}
             </span>
             <span className="change-employee">{change.employeeName}</span>
             <span className="change-date">{formatDate(change.date)}</span>
@@ -70,13 +71,15 @@ const ProposalCard = ({ proposal, status, onAccept, onReject }) => {
     return (
         <div className={`proposal-card ${isDone ? `proposal-${status}` : ''}`}>
             <div className="proposal-header">
-                <span className="proposal-icon">📋</span>
-                <div>
+                <div className="proposal-icon-wrapper">
+                    <FileText size={24} className="proposal-icon" />
+                </div>
+                <div style={{ flex: 1 }}>
                     <div className="proposal-title">Proposition de planning</div>
                     <div className="proposal-description">{proposal.description}</div>
                 </div>
-                {isApplied && <span className="proposal-status-badge applied">✅ Appliqué</span>}
-                {isRejected && <span className="proposal-status-badge rejected">❌ Refusé</span>}
+                {isApplied && <span className="proposal-status-badge applied"><CheckCircle2 size={14} /> Appliqué</span>}
+                {isRejected && <span className="proposal-status-badge rejected"><XCircle size={14} /> Refusé</span>}
             </div>
 
             <div className="proposal-changes">
@@ -88,10 +91,10 @@ const ProposalCard = ({ proposal, status, onAccept, onReject }) => {
             {!isDone && (
                 <div className="proposal-actions">
                     <button className="btn-accept" onClick={() => onAccept(proposal.changes)}>
-                        ✅ Appliquer ce planning
+                        <CheckCircle2 size={16} /> Appliquer
                     </button>
                     <button className="btn-reject" onClick={onReject}>
-                        ❌ Refuser
+                        <XCircle size={16} /> Refuser
                     </button>
                 </div>
             )}

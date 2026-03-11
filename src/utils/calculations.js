@@ -126,3 +126,56 @@ export const wouldExceedMaxHours = (shifts, employee, newShift) => {
     return (currentWeekHours + newShiftHours) > employee.maxHoursPerWeek;
 };
 
+/**
+ * Calcule les 4 KPI stratégiques pour une semaine donnée.
+ *
+ * @param {Array}  shifts       - Shifts filtrés pour la semaine
+ * @param {Array}  employees    - Liste des employés (avec hourlyRate)
+ * @param {Object} revenueEntry - { caPrevisionnel, nbCouverts } pour la semaine
+ * @param {number} capaciteMax  - Capacité max en couverts (0 = désactivé)
+ * @returns {Object} métriques calculées
+ */
+export const calculatePerformanceMetrics = (shifts, employees, revenueEntry, capaciteMax = 0) => {
+    const empMap = {};
+    employees.forEach(e => { empMap[e.id] = e; });
+
+    let totalHeures = 0;
+    let coutChargeTotal = 0;
+
+    shifts.forEach(s => {
+        const emp = empMap[s.employeeId];
+        const taux = emp?.hourlyRate || 0;
+        const split = splitShiftHours(s, taux);
+        totalHeures += split.heuresTotal;
+        coutChargeTotal += split.coutBrut * 1.42;
+    });
+
+    totalHeures = Math.round(totalHeures * 100) / 100;
+    coutChargeTotal = Math.round(coutChargeTotal);
+
+    const ca = revenueEntry?.caPrevisionnel ? parseFloat(revenueEntry.caPrevisionnel) : null;
+    const nbCouverts = revenueEntry?.nbCouverts ? parseInt(revenueEntry.nbCouverts) : null;
+
+    const ratioMasseSalariale = ca && ca > 0 && coutChargeTotal > 0
+        ? Math.round((coutChargeTotal / ca) * 1000) / 10 : null;
+
+    const productiviteHoraire = ca && ca > 0 && totalHeures > 0
+        ? Math.round(ca / totalHeures) : null;
+
+    const ticketMoyen = ca && ca > 0 && nbCouverts && nbCouverts > 0
+        ? Math.round((ca / nbCouverts) * 100) / 100 : null;
+
+    const tauxFrequentation = capaciteMax > 0 && nbCouverts && nbCouverts > 0
+        ? Math.round((nbCouverts / capaciteMax) * 1000) / 10 : null;
+
+    return {
+        ratioMasseSalariale,
+        productiviteHoraire,
+        ticketMoyen,
+        tauxFrequentation,
+        totalHeures,
+        coutChargeTotal,
+        ca,
+        nbCouverts,
+    };
+};

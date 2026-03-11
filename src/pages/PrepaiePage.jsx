@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/UI/Icons';
+import { Download, ChevronLeft, ChevronRight, Scale, Moon, Sun, AlertTriangle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { splitShiftHours } from '../utils/calculations';
 
@@ -209,15 +210,15 @@ const PrepaiePage = () => {
                         </button>
                     </div>
                     <button className="btn-export" onClick={handleExportCSV}>
-                        <Icons.Download size={18} /> Exporter CSV
+                        <Download size={18} /> Exporter CSV
                     </button>
                 </div>
             </div>
 
             {/* Légende majorations CCN HCR */}
             <div style={{
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08))',
-                border: '1px solid rgba(99,102,241,0.25)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border)',
                 borderRadius: '10px',
                 padding: '0.75rem 1.25rem',
                 marginBottom: '1rem',
@@ -227,16 +228,16 @@ const PrepaiePage = () => {
                 fontSize: '0.82rem',
                 color: 'var(--text-secondary)',
             }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>⚖️ CCN HCR — Majorations appliquées :</span>
-                <span>🌙 <strong>Heures de nuit</strong> (22h → 7h) : <strong style={{ color: '#f59e0b' }}>+10%</strong></span>
-                <span>☀️ <strong>Dimanche</strong> : <strong style={{ color: '#10b981' }}>+10%</strong></span>
-                <span>🌙☀️ <strong>Nuit + Dimanche</strong> cumulé : <strong style={{ color: '#ef4444' }}>+20%</strong></span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Scale size={14} /> CCN HCR — Majorations appliquées :</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Moon size={14} color="#f59e0b" /> Heures de nuit (22h → 7h) : <strong style={{ color: '#f59e0b' }}>+10%</strong></span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Sun size={14} color="#10b981" /> Dimanche : <strong style={{ color: '#10b981' }}>+10%</strong></span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Moon size={14} color="#ef4444" /><Sun size={14} color="#ef4444" /> Nuit + Dimanche cumulé : <strong style={{ color: '#ef4444' }}>+20%</strong></span>
             </div>
 
             {/* Non-compliant alert panel */}
             {nonCompliantEmployees.length > 0 && (
                 <div className="non-compliant-panel">
-                    <div className="non-compliant-icon">⚠️</div>
+                    <div className="non-compliant-icon"><AlertTriangle size={24} color="#ef4444" /></div>
                     <div className="non-compliant-content">
                         <div className="non-compliant-title">Alertes Heures Non Conformes</div>
                         <div className="non-compliant-message">
@@ -257,13 +258,13 @@ const PrepaiePage = () => {
                     <div className="stat-label">Heures totales</div>
                     <div className="stat-value">{totalHours.toFixed(2)} h</div>
                     {totalNuit > 0 && (
-                        <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.25rem' }}>
-                            dont 🌙 {totalNuit.toFixed(2)}h de nuit
+                        <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Moon size={12} /> {totalNuit.toFixed(2)}h de nuit
                         </div>
                     )}
                     {totalDimanche > 0 && (
-                        <div style={{ fontSize: '0.75rem', color: '#10b981' }}>
-                            dont ☀️ {totalDimanche.toFixed(2)}h dimanche
+                        <div style={{ fontSize: '0.75rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Sun size={12} /> {totalDimanche.toFixed(2)}h dimanche
                         </div>
                     )}
                 </div>
@@ -290,8 +291,8 @@ const PrepaiePage = () => {
                             <th>Employé</th>
                             <th>Taux</th>
                             <th>Heures Jour</th>
-                            <th>Heures Nuit 🌙</th>
-                            <th>Heures Dim. ☀️</th>
+                            <th>Heures Nuit <Moon size={14} style={{ verticalAlign: 'middle', display: 'inline' }} /></th>
+                            <th>Heures Dim. <Sun size={14} style={{ verticalAlign: 'middle', display: 'inline' }} /></th>
                             <th>Total Heures</th>
                             <th>Brut Est. (majoré)</th>
                             <th>Statut</th>
@@ -318,11 +319,11 @@ const PrepaiePage = () => {
                                         {hasNuit ? (
                                             <span style={{
                                                 display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                                background: 'rgba(245,158,11,0.12)', color: '#d97706',
+                                                background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
                                                 borderRadius: '6px', padding: '0.15rem 0.5rem',
                                                 fontWeight: 600, fontSize: '0.85rem',
                                             }}>
-                                                🌙 {stats.heuresNuit.toFixed(2)} h
+                                                <Moon size={14} /> {stats.heuresNuit.toFixed(2)} h
                                                 <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>+10%</span>
                                             </span>
                                         ) : (
@@ -335,11 +336,11 @@ const PrepaiePage = () => {
                                         {hasDim ? (
                                             <span style={{
                                                 display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                                background: 'rgba(16,185,129,0.12)', color: '#059669',
+                                                background: 'rgba(16,185,129,0.12)', color: '#10b981',
                                                 borderRadius: '6px', padding: '0.15rem 0.5rem',
                                                 fontWeight: 600, fontSize: '0.85rem',
                                             }}>
-                                                ☀️ {stats.heuresDimanche.toFixed(2)} h
+                                                <Sun size={14} /> {stats.heuresDimanche.toFixed(2)} h
                                                 <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>+10%</span>
                                             </span>
                                         ) : (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/UI/Icons';
+import { ChevronDown, ChevronRight, AlertTriangle, Moon, Clock, Calendar as CalendarIcon, Users, Calculator, Trash, X } from 'lucide-react';
 
 import { useData } from '../context/DataContext';
 import { calculateWeeklyHours, detectScheduleConflict, wouldExceedMaxHours } from '../utils/calculations';
@@ -187,7 +188,7 @@ const PlanningPage = () => {
         });
 
         if (conflict) {
-            warnings.push(`⚠️ Conflit d'horaire : ${employee.name} est déjà shifté de ${conflict.startTime} à ${conflict.endTime} ce jour`);
+            warnings.push(`Conflit d'horaire : ${employee.name} est déjà shifté de ${conflict.startTime} à ${conflict.endTime} ce jour`);
         }
 
         // Check for overtime (exclude current shift if editing)
@@ -196,7 +197,7 @@ const PlanningPage = () => {
             endTime: shiftFormData.endTime
         })) {
             const currentHours = calculateWeeklyHours(shiftsToCheck, employee.id);
-            warnings.push(`⚠️ Heures supplémentaires : ${employee.name} dépassera son quota (actuellement ${currentHours.toFixed(1)}h / ${employee.maxHoursPerWeek}h)`);
+            warnings.push(`Heures supplémentaires : ${employee.name} dépassera son quota (actuellement ${currentHours.toFixed(1)}h / ${employee.maxHoursPerWeek}h)`);
         }
 
         if (warnings.length > 0) {
@@ -306,7 +307,7 @@ const PlanningPage = () => {
                             className={`view-btn ${showAvailability ? 'active' : ''}`}
                             onClick={() => setShowAvailability(!showAvailability)}
                         >
-                            Disponibilités {showAvailability ? '▼' : '▶'}
+                            Disponibilités {showAvailability ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </button>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -333,7 +334,7 @@ const PlanningPage = () => {
             {
                 overtimeEmployees.length > 0 && (
                     <div className="conflict-alert">
-                        <div className="conflict-icon">⚠️</div>
+                        <div className="conflict-icon"><AlertTriangle size={24} color="#dc2626" /></div>
                         <div className="conflict-content">
                             <div className="conflict-title">Alerte Heures Supplémentaires</div>
                             <div className="conflict-message">
@@ -465,7 +466,7 @@ const PlanningPage = () => {
                                                 >
                                                     {(is22h || isMidnight) && (
                                                         <span style={{ fontSize: '0.6rem', color: 'rgba(99,102,241,0.6)', position: 'absolute', left: 2, top: -8 }}>
-                                                            {is22h ? '🌙22h' : '🌙 00h'}
+                                                            {is22h ? 'NUIT' : 'MINUIT'}
                                                         </span>
                                                     )}
                                                 </div>
@@ -484,7 +485,7 @@ const PlanningPage = () => {
                                     }}
                                         onClick={() => openEditShiftModal(hiddenShifts[0])}
                                     >
-                                        ⚠️ {hiddenShifts.map(s => {
+                                        <AlertTriangle size={10} style={{ marginRight: 4 }} /> {hiddenShifts.map(s => {
                                             const emp = currentEmployees.find(e => e.id === s.employeeId);
                                             return `${emp?.name} ${s.startTime}-${s.endTime}`;
                                         }).join(', ')}
@@ -511,7 +512,7 @@ const PlanningPage = () => {
                                             }}
                                             onClick={(e) => { e.stopPropagation(); openEditShiftModal(shift); }}
                                         >
-                                            {isNightShift && <div style={{ fontSize: '0.65rem', color: '#d97706', fontWeight: 700 }}>🌙 NUIT</div>}
+                                            {isNightShift && <div style={{ fontSize: '0.6rem', color: '#fbbf24', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 2 }}><Moon size={10} /> Nuit</div>}
                                             <div className="shift-name">{employee.name}</div>
                                             <div className="shift-time">{shift.startTime} - {shift.endTime}</div>
                                         </div>
@@ -538,7 +539,7 @@ const PlanningPage = () => {
                     <div className="modal">
                         <div className="modal-header">
                             <h2 className="modal-title">{editingShift ? 'Modifier un shift' : 'Ajouter un shift'}</h2>
-                            <button className="btn-close" onClick={() => setShowShiftModal(false)}><Icons.Close /></button>
+                            <button className="btn-close" onClick={() => setShowShiftModal(false)}><X size={20} /></button>
                         </div>
 
                         {validationWarnings.length > 0 && (

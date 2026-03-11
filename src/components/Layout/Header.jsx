@@ -1,6 +1,6 @@
-import React from 'react';
 import { Icons } from '../UI/Icons';
 import { useData } from '../../context/DataContext';
+import { Settings, Plus, LogOut, LayoutDashboard, Users, Calendar, Calculator, LineChart } from 'lucide-react';
 
 const Header = ({ currentTab, setCurrentTab, onOpenRestaurantModal }) => {
     const { currentRestaurantId, setCurrentRestaurantId, restaurants, currentRestaurant } = useData();
@@ -12,19 +12,19 @@ const Header = ({ currentTab, setCurrentTab, onOpenRestaurantModal }) => {
                 <span className="logo-text">Planify</span>
             </div>
             <nav className="nav">
-                <button className={`nav-btn ${currentTab === 'equipe' ? 'active' : ''}`} onClick={() => setCurrentTab('equipe')}><Icons.Users size={18} /> Équipe</button>
-                <button className={`nav-btn ${currentTab === 'planning' ? 'active' : ''}`} onClick={() => setCurrentTab('planning')}><Icons.Calendar size={18} /> Planning</button>
-                <button className={`nav-btn ${currentTab === 'prepaie' ? 'active' : ''}`} onClick={() => setCurrentTab('prepaie')}><Icons.Calculator size={18} /> Pré-paie</button>
-                <button className={`nav-btn ${currentTab === 'assistant' ? 'active' : ''}`} onClick={() => setCurrentTab('assistant')}><Icons.Sparkles size={18} /> Assistant IA</button>
+                <button className={`nav-btn ${currentTab === 'equipe' ? 'active' : ''}`} onClick={() => setCurrentTab('equipe')}><Users size={18} /> Equipe</button>
+                <button className={`nav-btn ${currentTab === 'planning' ? 'active' : ''}`} onClick={() => setCurrentTab('planning')}><Calendar size={18} /> Planning</button>
+                <button className={`nav-btn ${currentTab === 'prepaie' ? 'active' : ''}`} onClick={() => setCurrentTab('prepaie')}><Calculator size={18} /> Pré-paie</button>
+                <button className={`nav-btn ${currentTab === 'assistant' ? 'active' : ''}`} onClick={() => setCurrentTab('assistant')}><LineChart size={18} /> Analyse IA</button>
             </nav>
             <div className="user-section">
                 <select className="restaurant-selector" value={currentRestaurantId} onChange={(e) => setCurrentRestaurantId(parseInt(e.target.value))}>
-                    {restaurants.map(resto => <option key={resto.id} value={resto.id}>🏪 {resto.name}</option>)}
+                    {restaurants.map(resto => <option key={resto.id} value={resto.id}>{resto.name}</option>)}
                 </select>
-                <button className="restaurant-manage-btn" onClick={() => onOpenRestaurantModal('edit')} title="Modifier">✏️</button>
-                <button className="restaurant-manage-btn" onClick={() => onOpenRestaurantModal('create')} title="Ajouter">+</button>
+                <button className="restaurant-manage-btn" onClick={() => onOpenRestaurantModal('edit')} title="Réglages"><Settings size={16} /></button>
+                <button className="restaurant-manage-btn" onClick={() => onOpenRestaurantModal('create')} title="Ajouter"><Plus size={16} /></button>
                 <span className="user-email">arnaudriche03@gmail.com</span>
-                <button className="btn-disconnect">🚪 Déconnexion</button>
+                <button className="btn-disconnect"><LogOut size={16} /> Déconnexion</button>
             </div>
         </header>
     );

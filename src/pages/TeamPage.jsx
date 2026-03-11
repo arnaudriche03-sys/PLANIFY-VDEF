@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/UI/Icons';
+import { UserPlus, Settings, Trash2, X, Info } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 const EquipePage = () => {
@@ -95,7 +96,7 @@ const EquipePage = () => {
                     <p className="page-subtitle">Gérez vos employés, leurs contrats et disponibilités ({currentEmployees.length} actifs)</p>
                 </div>
                 <button className="btn-primary" onClick={() => openModal()}>
-                    <Icons.Plus size={18} /> Ajouter un employé
+                    <UserPlus size={18} /> Ajouter un employé
                 </button>
             </div>
 
@@ -112,7 +113,7 @@ const EquipePage = () => {
                             </div>
                             <div className="employee-actions">
                                 <button className="btn-edit" onClick={() => openModal(employee)}>
-                                    <Icons.Edit size={16} /> Modifier
+                                    <Settings size={16} /> Modifier
                                 </button>
                             </div>
                         </div>
@@ -136,7 +137,7 @@ const EquipePage = () => {
                     <div className="modal">
                         <div className="modal-header">
                             <h2 className="modal-title">{editingEmployee ? 'Modifier' : 'Ajouter'} un employé</h2>
-                            <button className="btn-close" onClick={() => setShowEmployeeModal(false)}><Icons.Close /></button>
+                            <button className="btn-close" onClick={() => setShowEmployeeModal(false)}><X size={20} /></button>
                         </div>
 
                         {/* Modal Body (kept same as before) */}
@@ -319,7 +320,7 @@ const EquipePage = () => {
                             {editingEmployee && (
                                 !showDeleteConfirm ? (
                                     <button className="btn-delete" onClick={() => setShowDeleteConfirm(true)}>
-                                        <Icons.Trash size={16} /> Supprimer
+                                        <Trash2 size={16} /> Supprimer
                                     </button>
                                 ) : (
                                     <div style={{ display: 'flex', gap: '8px' }}>
