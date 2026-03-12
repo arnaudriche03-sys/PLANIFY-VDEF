@@ -88,16 +88,26 @@ const AssistantPage = () => {
     const [auditData, setAuditData] = useState(null);
 
     const handleAudit = async (weekStart = null, viewType = 'week') => {
+        // Sécurisation : si la fonction est appelée via un onClick natif, weekStart est un SyntheticEvent
+        const finalWeekStart = typeof weekStart === 'string' ? weekStart : selectedKpiWeek;
+        const finalViewType = typeof viewType === 'string' ? viewType : 'week';
+
         setAuditOpen(true);
         setAuditLoading(true);
-        const result = await runStrategicAudit(weekStart, viewType);
+        const result = await runStrategicAudit(finalWeekStart, finalViewType);
         setAuditData(result);
         setAuditLoading(false);
     };
 
     // ── Helpers de semaine ───────────────────────────────────────────────────
     const getMondayOf = (date) => {
-        const d = new Date(date);
+        let d;
+        if (typeof date === 'string') {
+            const [y, m, da] = date.split('-').map(Number);
+            d = new Date(y, m - 1, da);
+        } else {
+            d = new Date(date);
+        }
         const day = d.getDay();
         const diff = day === 0 ? -6 : 1 - day;
         d.setDate(d.getDate() + diff);
@@ -110,8 +120,9 @@ const AssistantPage = () => {
         return d.toISOString().split('T')[0];
     };
     const fmtWeekLabel = (isoDate) => {
-        const d = new Date(isoDate);
-        const end = new Date(isoDate);
+        const [y, m, da] = isoDate.split('-').map(Number);
+        const d = new Date(y, m - 1, da);
+        const end = new Date(y, m - 1, da);
         end.setDate(d.getDate() + 6);
         const opts = { day: '2-digit', month: 'short' };
         return `${d.toLocaleDateString('fr-FR', opts)} — ${end.toLocaleDateString('fr-FR', opts)}`;

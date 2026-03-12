@@ -72,7 +72,7 @@ const Delta = ({ current, prev, invert = false }) => {
 
 // ── Carte KPI individuelle ───────────────────────────────────────────────────
 
-const KpiCard = ({ title, value, unit, prev, metricKey, maxVal, invert }) => {
+const KpiCard = ({ title, value, unit, prev, metricKey, maxVal, invert, thresholds }) => {
     const status = getStatus(metricKey, value);
     const { color, bg, border, label, Icon } = STATUS_CONFIG[status];
 
@@ -100,6 +100,11 @@ const KpiCard = ({ title, value, unit, prev, metricKey, maxVal, invert }) => {
                     <span style={{ fontSize: '1rem', color: '#475569' }}>— CA requis</span>
                 )}
             </div>
+            {thresholds && (
+                <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 4, letterSpacing: '0.02em', fontStyle: 'italic' }}>
+                    {thresholds}
+                </div>
+            )}
             <div style={{ marginTop: 4 }}>
                 <Delta current={value} prev={prev} invert={invert} />
             </div>
@@ -136,7 +141,25 @@ const AuditMarkdown = ({ content }) => {
 const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysisText, weekStart, isLoading }) => {
     if (!isOpen) return null;
 
-    const [currentDate, setCurrentDate] = React.useState(weekStart || new Date().toISOString().split('T')[0]);
+    // Helper local pour normaliser au lundi
+    const getMonday = (date) => {
+        let d;
+        if (typeof date === 'string') {
+            const [y, m, da] = date.split('-').map(Number);
+            d = new Date(y, m - 1, da);
+        } else {
+            d = new Date(date);
+        }
+        const day = d.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        d.setDate(d.getDate() + diff);
+        return d.toISOString().split('T')[0];
+    };
+
+    const [currentDate, setCurrentDate] = React.useState(() => {
+        const initial = weekStart || new Date().toISOString().split('T')[0];
+        return getMonday(initial);
+    });
     const [viewType, setViewType] = React.useState('week'); // 'week' | 'month'
 
     // Formater la période affichée
@@ -145,10 +168,7 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
         if (viewType === 'month') {
             return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
         }
-        const start = new Date(d);
-        const day = start.getDay();
-        const diff = day === 0 ? -6 : 1 - day;
-        start.setDate(start.getDate() + diff);
+        const start = new Date(getMonday(d));
         const end = new Date(start);
         end.setDate(end.getDate() + 6);
         return `${start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} — ${end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
@@ -158,7 +178,7 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
         const d = new Date(currentDate);
         if (viewType === 'month') d.setMonth(d.getMonth() - 1);
         else d.setDate(d.getDate() - 7);
-        const newDate = d.toISOString().split('T')[0];
+        const newDate = getMonday(d.toISOString().split('T')[0]);
         setCurrentDate(newDate);
         onRefresh(newDate, viewType);
     };
@@ -167,7 +187,7 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
         const d = new Date(currentDate);
         if (viewType === 'month') d.setMonth(d.getMonth() + 1);
         else d.setDate(d.getDate() + 7);
-        const newDate = d.toISOString().split('T')[0];
+        const newDate = getMonday(d.toISOString().split('T')[0]);
         setCurrentDate(newDate);
         onRefresh(newDate, viewType);
     };
@@ -179,6 +199,7 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
             unit: '%',
             maxVal: 60,
             invert: true,
+            thresholds: 'Optimal < 35% | Critique > 45%',
         },
         {
             key: 'productiviteHoraire',
@@ -186,6 +207,7 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
             unit: '€/h',
             maxVal: 150,
             invert: false,
+            thresholds: 'Optimal > 80€ | Critique < 60€',
         },
         {
             key: 'ticketMoyen',
@@ -193,6 +215,7 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
             unit: '€',
             maxVal: 60,
             invert: false,
+            thresholds: 'Cible par défaut : > 25€',
         },
         {
             key: 'tauxFrequentation',
@@ -200,6 +223,7 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
             unit: '%',
             maxVal: 100,
             invert: false,
+            thresholds: 'Optimal > 70%',
         },
     ];
 
@@ -305,6 +329,7 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
                                     unit={k.unit}
                                     maxVal={k.maxVal}
                                     invert={k.invert}
+                                    thresholds={k.thresholds}
                                 />
                             ))}
                         </div>

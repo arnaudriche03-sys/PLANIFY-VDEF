@@ -233,11 +233,14 @@ export const DataProvider = ({ children }) => {
             },
         }));
         try {
+            const safeCa = caPrevisionnel !== null ? Math.round(Number(caPrevisionnel) * 100) / 100 : null;
+            const safeCouverts = nbCouverts !== null ? Math.round(Number(nbCouverts)) : null;
+
             const { error } = await supabase.from('revenue_data').upsert({
                 restaurant_id: currentRestaurantId,
                 week_start: weekStart,
-                ca_previsionnel: caPrevisionnel || null,
-                nb_couverts: nbCouverts || null,
+                ca_previsionnel: safeCa,
+                nb_couverts: safeCouverts,
                 notes: notes || null,
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'restaurant_id,week_start' });
