@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Icons } from '../components/UI/Icons';
-import { ChevronDown, ChevronRight, AlertTriangle, Moon, Clock, Calendar as CalendarIcon, Users, Calculator, Trash, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, AlertTriangle, Moon, Clock, Calendar as CalendarIcon, Users, Calculator, Trash, X, ArrowRightLeft } from 'lucide-react';
 
 import { useData } from '../context/DataContext';
 import { calculateWeeklyHours, detectScheduleConflict, wouldExceedMaxHours } from '../utils/calculations';
 
 const PlanningPage = () => {
-    const { currentShifts, currentDayNotes, updateShifts, updateDayNotes, updateEmployees, currentEmployees, getEmployeeColor } = useData();
+    const { currentShifts, currentDayNotes, updateShifts, updateDayNotes, updateEmployees, currentEmployees, getEmployeeColor, shiftRequests } = useData();
     const [planningView, setPlanningView] = useState('week'); // 'week' or 'month'
     const [currentDate, setCurrentDate] = useState(new Date(2026, 1, 4));
     const [showShiftModal, setShowShiftModal] = useState(false);
@@ -500,6 +500,8 @@ const PlanningPage = () => {
                                     const startH = parseInt((shift.startTime || '0:0').split(':')[0]);
                                     const isNightShift = startH < 7;
 
+                                    const hasRequests = (shiftRequests || []).some(req => req.shiftId === shift.id && req.status === 'pending');
+
                                     return (
                                         <div
                                             key={shift.id}
@@ -508,12 +510,26 @@ const PlanningPage = () => {
                                                 borderColor: isNightShift ? '#f59e0b' : getEmployeeColor(employee.id),
                                                 backgroundColor: isNightShift ? 'rgba(245,158,11,0.15)' : `${getEmployeeColor(employee.id)}15`,
                                                 borderLeft: `4px solid ${isNightShift ? '#f59e0b' : getEmployeeColor(employee.id)}`,
+                                                position: 'relative',
                                                 ...style
                                             }}
                                             onClick={(e) => { e.stopPropagation(); openEditShiftModal(shift); }}
                                         >
+                                            {hasRequests && (
+                                                <div style={{
+                                                    position: 'absolute', top: -5, right: -5, background: '#f59e0b',
+                                                    color: 'white', borderRadius: '50%', width: 18, height: 18,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)', zIndex: 10
+                                                }} title="Demande d'échange en attente">
+                                                    <ArrowRightLeft size={10} strokeWidth={3} />
+                                                </div>
+                                            )}
                                             {isNightShift && <div style={{ fontSize: '0.6rem', color: '#fbbf24', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 2 }}><Moon size={10} /> Nuit</div>}
-                                            <div className="shift-name">{employee.name}</div>
+                                            <div className="shift-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                {employee.name}
+                                                {shift.status === 'offered' && <span style={{ fontSize: '0.6rem', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', padding: '1px 4px', borderRadius: 4 }}>Bourse</span>}
+                                            </div>
                                             <div className="shift-time">{shift.startTime} - {shift.endTime}</div>
                                         </div>
                                     )

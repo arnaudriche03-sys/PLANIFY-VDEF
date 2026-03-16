@@ -6,12 +6,14 @@ import PlanningPage from './pages/PlanningPage';
 import PrepaiePage from './pages/PrepaiePage';
 import AssistantPage from './pages/AssistantPage';
 import RestaurantModal from './components/Modals/RestaurantModal';
+import LoginPage from './pages/auth/LoginPage';
+import EmployeeDashboard from './pages/employee/EmployeeDashboard';
 
 function AppContent() {
   const [currentTab, setCurrentTab] = useState('equipe');
   const [showRestaurantModal, setShowRestaurantModal] = useState(false);
   const [restaurantModalMode, setRestaurantModalMode] = useState('create');
-  const { isLoading } = useData();
+  const { isLoading, currentUserRole } = useData();
 
   const handleOpenRestaurantModal = (mode) => {
     setRestaurantModalMode(mode);
@@ -36,7 +38,17 @@ function AppContent() {
     );
   }
 
-  // Render logic
+  // Si l'utilisateur n'est pas connecté
+  if (!currentUserRole) {
+    return <LoginPage />;
+  }
+
+  // Si l'utilisateur est un Employé (Dashboard mobile)
+  if (currentUserRole === 'employee') {
+    return <EmployeeDashboard />;
+  }
+
+  // Render logic : Vue Manager par défaut
   const renderContent = () => {
     switch (currentTab) {
       case 'equipe': return <EquipePage />;

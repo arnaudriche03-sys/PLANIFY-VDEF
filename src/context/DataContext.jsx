@@ -10,6 +10,7 @@ export const DataProvider = ({ children }) => {
     const [restaurants, setRestaurants] = useState([]);
     const [employees, setEmployees] = useState({});
     const [shifts, setShifts] = useState({});
+    const [shiftRequests, setShiftRequests] = useState([]); // Nouveau: Bourse d'échange
     const [dayNotes, setDayNotes] = useState({});
     const [paidStatus, setPaidStatus] = useState({});
     const [revenueData, setRevenueData] = useState({});
@@ -20,18 +21,22 @@ export const DataProvider = ({ children }) => {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const [resResult, empResult, shiResult, noteResult, revResult] = await Promise.all([
+            const [resResult, empResult, shiResult, noteResult, revResult, reqResult] = await Promise.all([
                 supabase.from('restaurants').select('*'),
                 supabase.from('employees').select('*'),
                 supabase.from('shifts').select('*'),
                 supabase.from('day_notes').select('*'),
                 supabase.from('revenue_data').select('*'),
+                supabase.from('shift_requests').select('*')
             ]);
 
             if (resResult.error) throw resResult.error;
             if (empResult.error) throw empResult.error;
             if (shiResult.error) throw shiResult.error;
             if (noteResult.error) throw noteResult.error;
+            if (reqResult.error && reqResult.error.code !== '42P01') {
+                console.warn('shift_requests table might not exist yet:', reqResult.error);
+            }
 
             setRestaurants(resResult.data || []);
 
@@ -67,9 +72,22 @@ export const DataProvider = ({ children }) => {
                     startTime: (shi.start_time || '').slice(0, 5),
                     endTime: (shi.end_time || '').slice(0, 5),
                     note: shi.note,
+                    status: shi.status || 'assigned' // Nouveau: status ('assigned', 'offered')
                 });
             });
             setShifts(shiByResto);
+
+            // Shift requests
+            if (reqResult.data) {
+                setShiftRequests(reqResult.data.map(req => ({
+                    id: req.id,
+                    shiftId: req.shift_id,
+                    requestingEmployeeId: req.requesting_employee_id,
+                    targetDate: req.target_date,
+                    status: req.status, // 'pending', 'approved', 'rejected'
+                    createdAt: req.created_at
+                })));
+            }
 
             // Notes par restaurant
             const noteByResto = {};
@@ -95,15 +113,56 @@ export const DataProvider = ({ children }) => {
             }
 
         } catch (error) {
-            console.error('Erreur lors du chargement Supabase:', error.message);
+            console.error('Erreur fetchData Supabase:', error);
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, []); // Removed isDemoMode as it's not defined in the original context
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    useEffect(() => {
+        if (currentRestaurantId) {
+            localStorage.setItem('currentRestaurantId', currentRestaurantId);
+        }
+    }, [currentRestaurantId]);
+
+    // ─── Gestion de l'Authentification (Manager vs Employee) ────────────────
+
+    // 'manager' ou 'employee'
+    const [currentUserRole, setCurrentUserRole] = useState(() => {
+        return localStorage.getItem('currentUserRole') || null; // null = non connecté
+    });
+
+    // ID de l'employé connecté (si role === 'employee')
+    const [currentEmployeeId, setCurrentEmployeeId] = useState(() => {
+        return parseInt(localStorage.getItem('currentEmployeeId')) || null;
+    });
+
+    useEffect(() => {
+        if (currentUserRole) localStorage.setItem('currentUserRole', currentUserRole);
+        else localStorage.removeItem('currentUserRole');
+
+        if (currentEmployeeId) localStorage.setItem('currentEmployeeId', currentEmployeeId);
+        else localStorage.removeItem('currentEmployeeId');
+    }, [currentUserRole, currentEmployeeId]);
+
+    const loginAsManager = () => {
+        setCurrentUserRole('manager');
+        setCurrentEmployeeId(null);
+    };
+
+    const loginAsEmployee = (employeeId) => {
+        setCurrentUserRole('employee');
+        setCurrentEmployeeId(employeeId);
+    };
+
+    const logout = () => {
+        setCurrentUserRole(null);
+        setCurrentEmployeeId(null);
+    };
 
     // ─── Valeurs dérivées ─────────────────────────────────────────────────────
 
@@ -179,24 +238,48 @@ export const DataProvider = ({ children }) => {
     // ─── Actions Shifts ───────────────────────────────────────────────────────
 
     const updateShifts = async (newShifts) => {
+        const oldShifts = shifts[currentRestaurantId] || [];
         // Mise à jour optimiste immédiate
         setShifts(prev => ({ ...prev, [currentRestaurantId]: newShifts }));
 
         try {
-            // Stratégie : delete all + re-insert pour ce restaurant
-            await supabase.from('shifts').delete().eq('restaurant_id', currentRestaurantId);
+            const oldIds = new Set(oldShifts.map(s => s.id));
+            const newIds = new Set(newShifts.map(s => s.id));
 
-            if (newShifts.length > 0) {
-                const shiftsToInsert = newShifts.map(s => ({
+            // Suppressions
+            const deleted = oldShifts.filter(s => !newIds.has(s.id));
+            if (deleted.length > 0) {
+                await supabase.from('shifts')
+                    .delete()
+                    .in('id', deleted.map(s => s.id));
+            }
+
+            // Ajouts et modifications
+            for (const s of newShifts) {
+                const isNew = !oldIds.has(s.id);
+                const payload = {
                     restaurant_id: currentRestaurantId,
                     employee_id: s.employeeId,
                     date: s.date,
                     start_time: s.startTime,
                     end_time: s.endTime,
                     note: s.note || '',
-                }));
-                const { error } = await supabase.from('shifts').insert(shiftsToInsert);
-                if (error) throw error;
+                };
+
+                if (isNew) {
+                    const { data, error } = await supabase.from('shifts').insert([payload]).select();
+                    if (!error && data?.[0]) {
+                        // Mettre à jour l'id local avec l'id réel de Supabase
+                        setShifts(prev => {
+                            const updated = (prev[currentRestaurantId] || []).map(shift =>
+                                shift.id === s.id ? { ...shift, id: data[0].id } : shift
+                            );
+                            return { ...prev, [currentRestaurantId]: updated };
+                        });
+                    }
+                } else {
+                    await supabase.from('shifts').update(payload).eq('id', s.id);
+                }
             }
         } catch (error) {
             console.error('Erreur updateShifts Supabase:', error);
@@ -250,6 +333,64 @@ export const DataProvider = ({ children }) => {
         }
     };
 
+    // ─── Bourse d'Échange (Shifts) ──────────────────────────────────────────
+
+    const offerShift = async (shiftId) => {
+        try {
+            // Mettre à jour en base de données
+            const { error } = await supabase
+                .from('shifts')
+                .update({ status: 'offered' })
+                .eq('id', shiftId);
+
+            if (error) throw error;
+
+            // Mettre à jour l'état local
+            const newShifts = { ...shifts };
+            if (newShifts[currentRestaurantId]) {
+                newShifts[currentRestaurantId] = newShifts[currentRestaurantId].map(s =>
+                    s.id === shiftId ? { ...s, status: 'offered' } : s
+                );
+            }
+            setShifts(newShifts);
+        } catch (error) {
+            console.error('Erreur offerShift Supabase:', error);
+            throw error;
+        }
+    };
+
+    const takeShift = async (shiftId, requestingEmployeeId, targetDate) => {
+        try {
+            // Créer la demande en BDD
+            const { data, error } = await supabase
+                .from('shift_requests')
+                .insert([{
+                    shift_id: shiftId,
+                    requesting_employee_id: requestingEmployeeId,
+                    target_date: targetDate,
+                    status: 'pending'
+                }])
+                .select();
+
+            if (error) throw error;
+
+            // Mettre à jour l'état local
+            if (data && data[0]) {
+                setShiftRequests(prev => [...prev, {
+                    id: data[0].id,
+                    shiftId: data[0].shift_id,
+                    requestingEmployeeId: data[0].requesting_employee_id,
+                    targetDate: data[0].target_date,
+                    status: data[0].status,
+                    createdAt: data[0].created_at
+                }]);
+            }
+        } catch (error) {
+            console.error('Erreur takeShift Supabase:', error);
+            throw error;
+        }
+    };
+
     // ─── Utilitaires ──────────────────────────────────────────────────────────
 
     const getEmployeeColor = (employeeId) => {
@@ -275,6 +416,14 @@ export const DataProvider = ({ children }) => {
     // ─── Context Value ────────────────────────────────────────────────────────
 
     const value = {
+        // Authentification
+        currentUserRole,
+        currentEmployeeId,
+        loginAsManager,
+        loginAsEmployee,
+        logout,
+
+        // Data Management originel
         currentRestaurantId,
         setCurrentRestaurantId,
         restaurants,
@@ -297,6 +446,11 @@ export const DataProvider = ({ children }) => {
         togglePaid,
         isLoading,
         refreshData: fetchData,
+
+        // Bourse d'échange
+        shiftRequests,
+        offerShift,
+        takeShift,
     };
 
     return (

@@ -3,7 +3,7 @@ import { useData } from '../../context/DataContext';
 import { Settings, Plus, LogOut, LayoutDashboard, Users, Calendar, Calculator, LineChart } from 'lucide-react';
 
 const Header = ({ currentTab, setCurrentTab, onOpenRestaurantModal }) => {
-    const { currentRestaurantId, setCurrentRestaurantId, restaurants, currentRestaurant } = useData();
+    const { currentRestaurantId, setCurrentRestaurantId, restaurants, currentRestaurant, logout } = useData();
 
     return (
         <header className="header">
@@ -24,7 +24,7 @@ const Header = ({ currentTab, setCurrentTab, onOpenRestaurantModal }) => {
                 <button className="restaurant-manage-btn" onClick={() => onOpenRestaurantModal('edit')} title="Réglages"><Settings size={16} /></button>
                 <button className="restaurant-manage-btn" onClick={() => onOpenRestaurantModal('create')} title="Ajouter"><Plus size={16} /></button>
                 <span className="user-email">arnaudriche03@gmail.com</span>
-                <button className="btn-disconnect"><LogOut size={16} /> Déconnexion</button>
+                <button className="btn-disconnect" onClick={logout}><LogOut size={16} /> Déconnexion</button>
             </div>
         </header>
     );
