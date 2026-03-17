@@ -179,3 +179,75 @@ export const calculatePerformanceMetrics = (shifts, employees, revenueEntry, cap
         nbCouverts,
     };
 };
+
+/**
+ * Identifie les créneaux horaires où personne n'est planifié durant les heures d'ouverture.
+ * @param {string} openingTime - "HH:MM"
+ * @param {string} closingTime - "HH:MM"
+ * @param {Array} dayShifts - Liste des shifts (réels) pour une journée
+ * @returns {Array} Liste des créneaux vacants [{ startTime, endTime }]
+ */
+export const getVacantTimeSlots = (openingTime, closingTime, dayShifts) => {
+    if (!openingTime || !closingTime) return [];
+
+    const [oh, om] = openingTime.split(':').map(Number);
+    const [ch, cm] = closingTime.split(':').map(Number);
+
+    let startMin = oh * 60 + om;
+    let endMin = ch * 60 + cm;
+    if (endMin <= startMin) endMin += 1440; // Fermeture après minuit
+
+    // Créer une timeline minute par minute (true si quelqu'un travaille)
+    const timeline = new Array(endMin - startMin).fill(false);
+
+    // Ne considérer que les shifts avec un employé assigné pour calculer la "couverture" réelle
+    const coveredShifts = dayShifts.filter(s => s.employeeId !== null && s.employeeId !== undefined);
+
+    coveredShifts.forEach(shift => {
+        const [sh, sm] = (shift.startTime || '00:00').split(':').map(Number);
+        const [eh, em] = (shift.endTime || '00:00').split(':').map(Number);
+
+        let sM = sh * 60 + sm;
+        let eM = eh * 60 + em;
+        if (eM <= sM) eM += 1440;
+
+        // Mapper sur la timeline de l'ouverture
+        for (let m = sM; m < eM; m++) {
+            if (m >= startMin && m < endMin) {
+                timeline[m - startMin] = true;
+            }
+        }
+    });
+
+    // Extraire les intervalles de 'false' (personne)
+    const vacantSlots = [];
+    let currentStart = null;
+
+    for (let i = 0; i <= timeline.length; i++) {
+        if (i < timeline.length && !timeline[i]) {
+            if (currentStart === null) currentStart = i;
+        } else {
+            if (currentStart !== null) {
+                const s = startMin + currentStart;
+                const e = startMin + i;
+                
+                const formatTime = (totalMin) => {
+                    const h = Math.floor((totalMin % 1440) / 60).toString().padStart(2, '0');
+                    const m = (totalMin % 60).toString().padStart(2, '0');
+                    return `${h}:${m}`;
+                };
+
+                // On ne garde que les trous de plus de 15 minutes
+                if (e - s >= 15) {
+                    vacantSlots.push({
+                        startTime: formatTime(s),
+                        endTime: formatTime(e)
+                    });
+                }
+                currentStart = null;
+            }
+        }
+    }
+
+    return vacantSlots;
+};

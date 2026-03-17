@@ -3,10 +3,12 @@ import { Icons } from '../components/UI/Icons';
 import { ChevronDown, ChevronRight, AlertTriangle, Moon, Clock, Calendar as CalendarIcon, Users, Calculator, Trash, X, ArrowRightLeft } from 'lucide-react';
 
 import { useData } from '../context/DataContext';
-import { calculateWeeklyHours, detectScheduleConflict, wouldExceedMaxHours } from '../utils/calculations';
+import { calculateWeeklyHours, detectScheduleConflict, wouldExceedMaxHours, getVacantTimeSlots } from '../utils/calculations';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const PlanningPage = () => {
-    const { currentShifts, currentDayNotes, updateShifts, updateDayNotes, updateEmployees, currentEmployees, getEmployeeColor, shiftRequests } = useData();
+    const { currentRestaurant, currentShifts, currentDayNotes, updateShifts, updateDayNotes, updateEmployees, currentEmployees, getEmployeeColor, shiftRequests, approveShiftRequest, rejectShiftRequest } = useData();
     const [planningView, setPlanningView] = useState('week'); // 'week' or 'month'
     const [currentDate, setCurrentDate] = useState(new Date(2026, 1, 4));
     const [showShiftModal, setShowShiftModal] = useState(false);
@@ -173,7 +175,8 @@ const PlanningPage = () => {
         }
 
         const warnings = [];
-        const employee = currentEmployees.find(e => e.id === parseInt(shiftFormData.employeeId));
+        const isVacant = shiftFormData.employeeId === 'vacant' || !shiftFormData.employeeId;
+        const employee = isVacant ? null : currentEmployees.find(e => e.id === parseInt(shiftFormData.employeeId));
 
         // Check for schedule conflicts (exclude current shift if editing)
         const shiftsToCheck = editingShift
@@ -187,7 +190,7 @@ const PlanningPage = () => {
             endTime: shiftFormData.endTime
         });
 
-        if (conflict) {
+        if (conflict && employee) {
             warnings.push(`Conflit d'horaire : ${employee.name} est déjà shifté de ${conflict.startTime} à ${conflict.endTime} ce jour`);
         }
 
@@ -212,7 +215,7 @@ const PlanningPage = () => {
                 s.id === editingShift.id
                     ? {
                         ...s,
-                        employeeId: parseInt(shiftFormData.employeeId),
+                        employeeId: isVacant ? null : parseInt(shiftFormData.employeeId),
                         date: shiftFormData.date,
                         startTime: shiftFormData.startTime,
                         endTime: shiftFormData.endTime,
@@ -225,7 +228,7 @@ const PlanningPage = () => {
             const newId = Math.max(...currentShifts.map(s => s.id), 0) + 1;
             updateShifts([...currentShifts, {
                 id: newId,
-                employeeId: parseInt(shiftFormData.employeeId),
+                employeeId: isVacant ? null : parseInt(shiftFormData.employeeId),
                 date: shiftFormData.date,
                 startTime: shiftFormData.startTime,
                 endTime: shiftFormData.endTime,
@@ -245,7 +248,7 @@ const PlanningPage = () => {
                 s.id === editingShift.id
                     ? {
                         ...s,
-                        employeeId: parseInt(shiftFormData.employeeId),
+                        employeeId: isVacant ? null : parseInt(shiftFormData.employeeId),
                         date: shiftFormData.date,
                         startTime: shiftFormData.startTime,
                         endTime: shiftFormData.endTime,
@@ -258,7 +261,7 @@ const PlanningPage = () => {
             const newId = Math.max(...currentShifts.map(s => s.id), 0) + 1;
             updateShifts([...currentShifts, {
                 id: newId,
-                employeeId: parseInt(shiftFormData.employeeId),
+                employeeId: isVacant ? null : parseInt(shiftFormData.employeeId),
                 date: shiftFormData.date,
                 startTime: shiftFormData.startTime,
                 endTime: shiftFormData.endTime,
@@ -387,6 +390,69 @@ const PlanningPage = () => {
                 </div>
             )}
 
+            {/* Shift Requests Section (Toutes les demandes en attente) */}
+            {(() => {
+                const pendingRequests = (shiftRequests || []).filter(req => req.status === 'pending');
+
+                if (pendingRequests.length === 0) return null;
+
+                return (
+                    <div style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <ArrowRightLeft size={18} /> Demandes de shifts en attente
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                            {pendingRequests.map(req => {
+                                const shift = currentShifts.find(s => s.id === req.shiftId);
+                                const requester = currentEmployees.find(e => e.id === req.requestingEmployeeId);
+                                const originalOwner = currentEmployees.find(e => e.id === req.originalEmployeeId);
+                                if (!shift || !requester) return null;
+
+                                return (
+                                    <div key={req.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                            <div>
+                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'capitalize' }}>
+                                                    {format(new Date(shift.date), 'EEEE d MMMM', { locale: fr })}
+                                                </div>
+                                                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                                                    {shift.startTime} - {shift.endTime}
+                                                </div>
+                                            </div>
+                                            <div style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                ÉCHANGE
+                                            </div>
+                                        </div>
+                                        
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                                            <Users size={16} color="var(--text-muted)" />
+                                            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                                <strong style={{ color: 'var(--text-primary)' }}>{requester.name}</strong> souhaite {shift.employeeId === null ? "récupérer ce poste" : `remplacer ${originalOwner?.name || '?'}`}
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                            <button 
+                                                onClick={() => approveShiftRequest(req.id, shift.id, requester.id)}
+                                                style={{ flex: 1, background: 'var(--primary)', color: 'white', border: 'none', padding: '8px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: '0.2s' }}
+                                            >
+                                                Accepter
+                                            </button>
+                                            <button 
+                                                onClick={() => rejectShiftRequest(req.id)}
+                                                style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '8px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: '0.2s' }}
+                                            >
+                                                Refuser
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Calendar Grid - Week or Month View */}
             <div className={`calendar-grid ${planningView === 'month' ? 'month-view' : 'week-view'}`}>
                 {displayDates.map((date, idx) => {
@@ -394,17 +460,16 @@ const PlanningPage = () => {
                     const dayShifts = currentShifts.filter(s => s.date === date.dateString).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
                     // Calculate layout for overlaps (only for week view)
-                    const getShiftStyle = (shift) => {
+                    const getShiftStyle = (shift, allVisibleCards = dayShifts) => {
                         if (planningView === 'month') return {};
 
-                        const startHour = 7;  // Grille : 7h → 02h du matin (19h de plage restau)
-                        const endHour = 26;   // 26h = 02h AM jour suivant
-                        const totalMinutes = (endHour - startHour) * 60; // 19 * 60 = 1140
+                        const startHour = 7;
+                        const endHour = 26;
+                        const totalMinutes = (endHour - startHour) * 60;
 
                         const [startH, startM] = shift.startTime.split(':').map(Number);
                         const [endH, endM] = shift.endTime.split(':').map(Number);
 
-                        // Normalise l'heure de fin pour les shifts après minuit (< startHour)
                         const endHNorm = endH < startHour ? endH + 24 : endH;
                         const startMinutes = (startH * 60 + startM) - (startHour * 60);
                         let durationMinutes = (endHNorm * 60 + endM) - (startH * 60 + startM);
@@ -413,9 +478,21 @@ const PlanningPage = () => {
                         const top = (startMinutes / totalMinutes) * 100;
                         const height = (durationMinutes / totalMinutes) * 100;
 
-                        const overlaps = dayShifts.filter(s => {
+                        // On calcule les overlaps par rapport aux CARTES affichées, pas seulement aux shifts individuels
+                        const overlaps = allVisibleCards.filter(s => {
                             if (s.id === shift.id) return true;
-                            return (s.startTime < shift.endTime && s.endTime > shift.startTime);
+                            // Check overlap for cards (grouped or single)
+                            const [s1H, s1M] = s.startTime.split(':').map(Number);
+                            const [e1H, e1M] = s.endTime.split(':').map(Number);
+                            const e1Norm = e1H < startHour ? e1H + 24 : e1H;
+
+                            const s1Min = s1H * 60 + s1M;
+                            const e1Min = e1Norm * 60 + e1M;
+
+                            const s2Min = startH * 60 + startM;
+                            const e2Min = endHNorm * 60 + endM;
+
+                            return s1Min < e2Min && s2Min < e1Min;
                         });
 
                         const overlapIndex = overlaps.findIndex(s => s.id === shift.id);
@@ -492,47 +569,183 @@ const PlanningPage = () => {
                                     </div>
                                 )}
 
-                                {dayShifts.map(shift => {
-                                    const employee = currentEmployees.find(e => e.id === shift.employeeId);
-                                    if (!employee) return null;
+                                {/* Traitement et groupement des shifts */}
+                                {(() => {
+                                    // 1. Séparer real et vacant
+                                    const realShifts = dayShifts.filter(s => s.employeeId !== null && s.employeeId !== undefined);
+                                    const vacantShifts = dayShifts.filter(s => s.employeeId === null || s.employeeId === undefined);
 
-                                    const style = getShiftStyle(shift);
-                                    const startH = parseInt((shift.startTime || '0:0').split(':')[0]);
-                                    const isNightShift = startH < 7;
+                                    // 2. Grouper les vacant par (startTime, endTime)
+                                    const groupedVacant = [];
+                                    const vacantMap = new Map();
 
-                                    const hasRequests = (shiftRequests || []).some(req => req.shiftId === shift.id && req.status === 'pending');
+                                    vacantShifts.forEach(vs => {
+                                        const key = `${vs.startTime}-${vs.endTime}`;
+                                        if (vacantMap.has(key)) {
+                                            const group = vacantMap.get(key);
+                                            group.count++;
+                                            group.ids.push(vs.id);
+                                        } else {
+                                            const group = {
+                                                id: `group-${vs.id}`,
+                                                startTime: vs.startTime,
+                                                endTime: vs.endTime,
+                                                date: vs.date,
+                                                count: 1,
+                                                ids: [vs.id],
+                                                isGroup: true
+                                            };
+                                            vacantMap.set(key, group);
+                                            groupedVacant.push(group);
+                                        }
+                                    });
+
+                                    // 3. Liste finale des cartes à afficher pour le calcul d'overlap
+                                    const allVisibleCards = [...realShifts, ...groupedVacant];
 
                                     return (
+                                        <>
+                                            {/* Rendu des shifts réels */}
+                                            {realShifts.map(shift => {
+                                                const employee = currentEmployees.find(e => e.id === shift.employeeId);
+                                                if (!employee) return null;
+
+                                                const style = getShiftStyle(shift, allVisibleCards);
+                                                const startH = parseInt((shift.startTime || '0:0').split(':')[0]);
+                                                const isNightShift = startH < 7;
+                                                const hasRequests = (shiftRequests || []).some(req => req.shiftId === shift.id && req.status === 'pending');
+
+                                                return (
+                                                    <div
+                                                        key={shift.id}
+                                                        className={`shift-card ${planningView === 'week' ? 'shift-timeline' : ''}`}
+                                                        style={{
+                                                            borderColor: isNightShift ? '#f59e0b' : getEmployeeColor(employee.id),
+                                                            backgroundColor: isNightShift ? 'rgba(245,158,11,0.15)' : `${getEmployeeColor(employee.id)}15`,
+                                                            borderLeft: `4px solid ${isNightShift ? '#f59e0b' : getEmployeeColor(employee.id)}`,
+                                                            position: 'relative',
+                                                            padding: allVisibleCards.length > 3 ? '4px 6px' : '0.75rem',
+                                                            ...style
+                                                        }}
+                                                        onClick={(e) => { e.stopPropagation(); openEditShiftModal(shift); }}
+                                                    >
+                                                        {isNightShift && <div style={{ fontSize: '0.6rem', color: '#fbbf24', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 2 }}><Moon size={10} /> Nuit</div>}
+                                                        <div className="shift-name" style={{ 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            gap: 4, 
+                                                            fontSize: allVisibleCards.length > 3 ? '0.7rem' : '0.8rem',
+                                                            lineHeight: 1.1
+                                                        }}>
+                                                            {employee.name}
+                                                        </div>
+                                                        <div className="shift-time" style={{ 
+                                                            fontSize: allVisibleCards.length > 3 ? '0.6rem' : '0.7rem',
+                                                            opacity: 0.9
+                                                        }}>
+                                                            {shift.startTime} - {shift.endTime}
+                                                        </div>
+
+                                                        {/* Badges footer */}
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '4px' }}>
+                                                            {shift.status === 'offered' ? (
+                                                                <span style={{ fontSize: '0.55rem', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
+                                                                    BOURSE
+                                                                </span>
+                                                            ) : <div />}
+                                                            
+                                                            {hasRequests && (
+                                                                <div style={{
+                                                                    background: '#f59e0b',
+                                                                    color: 'white', borderRadius: '50%', width: 16, height: 16,
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                                                }} title="Demande d'échange en attente">
+                                                                    <ArrowRightLeft size={10} strokeWidth={3} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {/* Rendu des shifts vacants groupés (Besoins manuels) */}
+                                            {groupedVacant.map(group => {
+                                                const style = getShiftStyle(group, allVisibleCards);
+                                                return (
+                                                    <div
+                                                        key={group.id}
+                                                        className="shift-card"
+                                                        style={{
+                                                            borderColor: '#8b5cf6', // Violet distinct
+                                                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                                                            borderLeft: '4px solid #8b5cf6',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            justifyContent: 'center',
+                                                            padding: allVisibleCards.length > 3 ? '4px 6px' : '0.75rem',
+                                                            ...style
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            // On ouvre le premier shift du groupe pour modification
+                                                            const firstShift = vacantShifts.find(s => s.id === parseInt(group.ids[0]));
+                                                            openEditShiftModal(firstShift);
+                                                        }}
+                                                    >
+                                                        <div style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: 2 }}>
+                                                            Besoin
+                                                        </div>
+                                                        <div style={{ color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 800 }}>
+                                                            {group.count} {group.count > 1 ? 'pers.' : 'pers.'}
+                                                        </div>
+                                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.65rem', fontWeight: 600 }}>
+                                                            {group.startTime} - {group.endTime}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </>
+                                    );
+                                })()}
+
+                                {getVacantTimeSlots(currentRestaurant.openingTime, currentRestaurant.closingTime, dayShifts).map((vacant, vIdx) => {
+                                    // Pour les slots virtuels, on utilise toujours dayShifts pour le calcul (ou mieux, allVisibleCards)
+                                    // Mais les virtual n'overlap jamais entre eux normalement.
+                                    const style = getShiftStyle(vacant, [...dayShifts, ...getVacantTimeSlots(currentRestaurant.openingTime, currentRestaurant.closingTime, dayShifts).map((v, i) => ({ ...v, id: `v-${i}` }))]);
+                                    return (
                                         <div
-                                            key={shift.id}
-                                            className={`shift-card ${planningView === 'week' ? 'shift-timeline' : ''}`}
+                                            key={`vacant-${vIdx}`}
+                                            className="shift-card vacant-virtual"
                                             style={{
-                                                borderColor: isNightShift ? '#f59e0b' : getEmployeeColor(employee.id),
-                                                backgroundColor: isNightShift ? 'rgba(245,158,11,0.15)' : `${getEmployeeColor(employee.id)}15`,
-                                                borderLeft: `4px solid ${isNightShift ? '#f59e0b' : getEmployeeColor(employee.id)}`,
-                                                position: 'relative',
-                                                ...style
+                                                ...style,
+                                                border: '2px dashed #94a3b8',
+                                                backgroundColor: 'rgba(148, 163, 184, 0.05)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                                cursor: 'pointer',
+                                                zIndex: 5
                                             }}
-                                            onClick={(e) => { e.stopPropagation(); openEditShiftModal(shift); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingShift(null);
+                                                setShiftFormData({
+                                                    date: date.dateString,
+                                                    employeeId: 'vacant',
+                                                    startTime: vacant.startTime,
+                                                    endTime: vacant.endTime,
+                                                    note: ''
+                                                });
+                                                setShowShiftModal(true);
+                                            }}
                                         >
-                                            {hasRequests && (
-                                                <div style={{
-                                                    position: 'absolute', top: -5, right: -5, background: '#f59e0b',
-                                                    color: 'white', borderRadius: '50%', width: 18, height: 18,
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)', zIndex: 10
-                                                }} title="Demande d'échange en attente">
-                                                    <ArrowRightLeft size={10} strokeWidth={3} />
-                                                </div>
-                                            )}
-                                            {isNightShift && <div style={{ fontSize: '0.6rem', color: '#fbbf24', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 2 }}><Moon size={10} /> Nuit</div>}
-                                            <div className="shift-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                {employee.name}
-                                                {shift.status === 'offered' && <span style={{ fontSize: '0.6rem', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', padding: '1px 4px', borderRadius: 4 }}>Bourse</span>}
-                                            </div>
-                                            <div className="shift-time">{shift.startTime} - {shift.endTime}</div>
+                                            <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold' }}>AIDE ?</div>
+                                            <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>{vacant.startTime}-{vacant.endTime}</div>
                                         </div>
-                                    )
+                                    );
                                 })}
 
                                 {/* Click to add shift at specific time (approx) */}
@@ -581,6 +794,7 @@ const PlanningPage = () => {
                                 value={shiftFormData.employeeId}
                                 onChange={(e) => setShiftFormData({ ...shiftFormData, employeeId: e.target.value })}
                             >
+                                <option value="vacant">-- Poste Libre (Besoin) --</option>
                                 {currentEmployees.map(emp => (
                                     <option key={emp.id} value={emp.id}>{emp.name} - {emp.role}</option>
                                 ))}
@@ -617,6 +831,51 @@ const PlanningPage = () => {
                                 placeholder="Note optionnelle..."
                             />
                         </div>
+
+                        {editingShift && (shiftRequests || []).some(req => req.shiftId === editingShift.id && req.status === 'pending') && (
+                            <div className="form-group" style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(245,158,11,0.05)', borderRadius: '12px', border: '1px solid rgba(245,158,11,0.2)' }}>
+                                <label className="form-label" style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                    <ArrowRightLeft size={16} /> Demandes d'échange en attente
+                                </label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {shiftRequests
+                                        .filter(req => req.shiftId === editingShift.id && req.status === 'pending')
+                                        .map(req => {
+                                            const requester = currentEmployees.find(e => e.id === req.requestingEmployeeId);
+                                            return (
+                                                <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: '8px' }}>
+                                                    <span style={{ fontWeight: 600, color: '#f1f5f9' }}>{requester?.name || 'Inconnu'}</span>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button
+                                                            className="btn-primary"
+                                                            style={{ padding: '4px 12px', fontSize: '0.8rem', background: '#10b981' }}
+                                                            onClick={async () => {
+                                                                if (window.confirm(`Approuver le remplacement par ${requester?.name} ?`)) {
+                                                                    await approveShiftRequest(req.id, editingShift.id, req.requestingEmployeeId);
+                                                                    setShowShiftModal(false);
+                                                                }
+                                                            }}
+                                                        >
+                                                            Approuver
+                                                        </button>
+                                                        <button
+                                                            className="btn-secondary"
+                                                            style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+                                                            onClick={async () => {
+                                                                if (window.confirm(`Refuser la demande de ${requester?.name} ?`)) {
+                                                                    await rejectShiftRequest(req.id);
+                                                                }
+                                                            }}
+                                                        >
+                                                            Refuser
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="form-actions">
                             {editingShift && (

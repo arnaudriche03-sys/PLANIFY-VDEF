@@ -12,7 +12,7 @@ const RestaurantModal = ({ onClose, mode }) => {
     } = useData();
 
     const isEdit = mode === 'edit';
-    const [formData, setFormData] = useState({ name: '', address: '' });
+    const [formData, setFormData] = useState({ name: '', address: '', openingTime: '09:00', closingTime: '23:00' });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     useEffect(() => {
@@ -21,7 +21,9 @@ const RestaurantModal = ({ onClose, mode }) => {
         } else if (currentRestaurant) {
             setFormData({
                 name: currentRestaurant.name,
-                address: currentRestaurant.address
+                address: currentRestaurant.address,
+                openingTime: currentRestaurant.openingTime || '09:00',
+                closingTime: currentRestaurant.closingTime || '23:00'
             });
         }
         setShowDeleteConfirm(false);
@@ -33,14 +35,39 @@ const RestaurantModal = ({ onClose, mode }) => {
 
         if (mode === 'create') {
             const newId = Math.max(...restaurants.map(r => r.id), 0) + 1;
-            const newRestaurant = { id: newId, ...formData };
-            updateRestaurants([...restaurants, newRestaurant]);
+            const newRestaurant = {
+                id: newId,
+                name: formData.name,
+                address: formData.address,
+                opening_time: formData.openingTime,
+                closing_time: formData.closingTime
+            };
+            updateRestaurants([...restaurants, {
+                id: newId,
+                name: formData.name,
+                address: formData.address,
+                openingTime: formData.openingTime,
+                closingTime: formData.closingTime
+            }]);
             setCurrentRestaurantId(newId);
         } else {
             const updatedRestaurants = restaurants.map(r =>
-                r.id === currentRestaurantId ? { ...r, ...formData } : r
+                r.id === currentRestaurantId ? {
+                    ...r,
+                    name: formData.name,
+                    address: formData.address,
+                    openingTime: formData.openingTime,
+                    closingTime: formData.closingTime
+                } : r
             );
-            updateRestaurants(updatedRestaurants);
+            // Persister en BDD (mapping camelCase -> snake_case)
+            const payload = {
+                name: formData.name,
+                address: formData.address,
+                opening_time: formData.openingTime,
+                closing_time: formData.closingTime
+            };
+            updateRestaurants(updatedRestaurants, payload);
         }
         onClose();
     };
@@ -87,6 +114,26 @@ const RestaurantModal = ({ onClose, mode }) => {
                             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                             placeholder="Ex: 12 rue de la Paix..."
                         />
+                    </div>
+                    <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                            <label>Heure d'ouverture</label>
+                            <input
+                                type="time"
+                                className="form-input"
+                                value={formData.openingTime}
+                                onChange={(e) => setFormData({ ...formData, openingTime: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label>Heure de fermeture</label>
+                            <input
+                                type="time"
+                                className="form-input"
+                                value={formData.closingTime}
+                                onChange={(e) => setFormData({ ...formData, closingTime: e.target.value })}
+                            />
+                        </div>
                     </div>
                 </div>
 

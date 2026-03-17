@@ -38,7 +38,13 @@ export const DataProvider = ({ children }) => {
                 console.warn('shift_requests table might not exist yet:', reqResult.error);
             }
 
-            setRestaurants(resResult.data || []);
+            setRestaurants((resResult.data || []).map(r => ({
+                id: r.id,
+                name: r.name,
+                address: r.address,
+                openingTime: r.opening_time || '09:00',
+                closingTime: r.closing_time || '23:00'
+            })));
 
             // Employees par restaurant
             const empByResto = {};
@@ -174,8 +180,15 @@ export const DataProvider = ({ children }) => {
 
     // ─── Actions Restaurants ──────────────────────────────────────────────────
 
-    const updateRestaurants = async (newRestaurants) => {
+    const updateRestaurants = async (newRestaurants, dbPayload = null) => {
         setRestaurants(newRestaurants);
+        if (dbPayload && currentRestaurantId) {
+            try {
+                await supabase.from('restaurants').update(dbPayload).eq('id', currentRestaurantId);
+            } catch (error) {
+                console.error('Erreur updateRestaurants Supabase:', error);
+            }
+        }
     };
 
     // ─── Actions Employés ─────────────────────────────────────────────────────
@@ -259,7 +272,7 @@ export const DataProvider = ({ children }) => {
                 const isNew = !oldIds.has(s.id);
                 const payload = {
                     restaurant_id: currentRestaurantId,
-                    employee_id: s.employeeId,
+                    employee_id: s.employeeId || null,
                     date: s.date,
                     start_time: s.startTime,
                     end_time: s.endTime,
@@ -391,6 +404,79 @@ export const DataProvider = ({ children }) => {
         }
     };
 
+    const approveShiftRequest = async (requestId, shiftId, newEmployeeId) => {
+        try {
+            // 1. Marquer la demande comme approuvée
+            const { error: errorApprove } = await supabase
+                .from('shift_requests')
+                .update({ status: 'approved' })
+                .eq('id', requestId);
+            if (errorApprove) throw errorApprove;
+
+            // 2. Marquer les AUTRES demandes pour ce même shift comme rejetées
+            await supabase
+                .from('shift_requests')
+                .update({ status: 'rejected' })
+                .eq('shift_id', shiftId)
+                .neq('id', requestId)
+                .eq('status', 'pending');
+
+            // 3. Mettre à jour le shift lui-même (nouvel employé + status 'assigned')
+            const { error: errorShift } = await supabase
+                .from('shifts')
+                .update({
+                    employee_id: newEmployeeId,
+                    status: 'assigned'
+                })
+                .eq('id', shiftId);
+            if (errorShift) throw errorShift;
+
+            // 4. Mettre à jour l'état local des demandes
+            setShiftRequests(prev => prev.map(req => {
+                if (req.id === requestId) return { ...req, status: 'approved' };
+                if (req.shiftId === shiftId && req.status === 'pending') return { ...req, status: 'rejected' };
+                return req;
+            }));
+
+            // 5. Mettre à jour l'état local des shifts
+            setShifts(prev => {
+                const updated = { ...prev };
+                if (updated[currentRestaurantId]) {
+                    updated[currentRestaurantId] = updated[currentRestaurantId].map(s =>
+                        s.id === shiftId ? { ...s, employeeId: newEmployeeId, status: 'assigned' } : s
+                    );
+                }
+                return updated;
+            });
+
+        } catch (error) {
+            console.error('Erreur approveShiftRequest Supabase:', error);
+            throw error;
+        }
+    };
+
+    const rejectShiftRequest = async (requestId) => {
+        try {
+            const { error } = await supabase
+                .from('shift_requests')
+                .update({ status: 'rejected' })
+                .eq('id', requestId);
+
+            if (error) throw error;
+
+            setShiftRequests(prev => prev.map(req =>
+                req.id === requestId ? { ...req, status: 'rejected' } : req
+            ));
+        } catch (error) {
+            console.error('Erreur rejectShiftRequest Supabase:', error);
+            throw error;
+        }
+    };
+
+    const claimVacantShift = async (shiftId, requestingEmployeeId, date) => {
+        return takeShift(shiftId, requestingEmployeeId, date);
+    };
+
     // ─── Utilitaires ──────────────────────────────────────────────────────────
 
     const getEmployeeColor = (employeeId) => {
@@ -451,6 +537,9 @@ export const DataProvider = ({ children }) => {
         shiftRequests,
         offerShift,
         takeShift,
+        approveShiftRequest,
+        rejectShiftRequest,
+        claimVacantShift,
     };
 
     return (
