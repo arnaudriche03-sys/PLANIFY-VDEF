@@ -253,8 +253,12 @@ const EmployeeDashboard = () => {
 
                 {/* Mes Demandes de Shifts / Notifications */}
                 {(() => {
-                    const myRequests = (shiftRequests || []).filter(req => req.requestingEmployeeId === currentEmployeeId);
+                    const myRequests = (shiftRequests || [])
+                        .filter(req => req.requestingEmployeeId === currentEmployeeId)
+                        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+                    
                     if (myRequests.length === 0) return null;
+
 
                     return (
                         <div style={{ marginTop: '24px', padding: '0 12px' }}>
