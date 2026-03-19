@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons } from '../components/UI/Icons';
 import { ChevronDown, ChevronRight, AlertTriangle, Moon, Clock, Calendar as CalendarIcon, Users, Calculator, Trash, X, ArrowRightLeft } from 'lucide-react';
 
@@ -8,9 +8,18 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const PlanningPage = () => {
-    const { currentRestaurant, currentShifts, currentDayNotes, updateShifts, updateDayNotes, updateEmployees, currentEmployees, getEmployeeColor, shiftRequests, approveShiftRequest, rejectShiftRequest } = useData();
+    const { 
+        currentRestaurant, currentShifts, currentDayNotes, updateShifts, updateDayNotes, 
+        updateEmployees, currentEmployees, getEmployeeColor, shiftRequests, approveShiftRequest, 
+        rejectShiftRequest, currentAvailabilities, refreshData, approveAvailability, rejectAvailability
+    } = useData();
+
+    
+    const [actionLoading, setActionLoading] = useState(false);
+
+
     const [planningView, setPlanningView] = useState('week'); // 'week' or 'month'
-    const [currentDate, setCurrentDate] = useState(new Date(2026, 1, 4));
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [showShiftModal, setShowShiftModal] = useState(false);
     const [showAvailability, setShowAvailability] = useState(true); // Toggle for availability panel
     const [editingShift, setEditingShift] = useState(null); // null for create, shift object for edit
@@ -162,52 +171,89 @@ const PlanningPage = () => {
         if (editingShift) {
             updateShifts(currentShifts.filter(s => s.id !== editingShift.id));
             setShowShiftModal(false);
-            setEditingShift(null);
-            setShowDeleteConfirm(false);
         }
     };
 
-    // Validate and save shift (create or update)
+    // Validation temps réel pour les alertes de disponibilité
+    useEffect(() => {
+        if (!showShiftModal) return;
+        
+        const warnings = [];
+        const isVacant = shiftFormData.employeeId === 'vacant' || !shiftFormData.employeeId;
+        const employee = isVacant ? null : currentEmployees.find(e => e.id == shiftFormData.employeeId);
+
+        if (employee && shiftFormData.date) {
+            // Check for schedule conflicts (exclude current shift if editing)
+            const shiftsToCheck = editingShift
+                ? currentWeekShifts.filter(s => s.id !== editingShift.id)
+                : currentWeekShifts;
+
+            const conflict = detectScheduleConflict(shiftsToCheck, {
+                employeeId: employee.id,
+                date: shiftFormData.date,
+                startTime: shiftFormData.startTime,
+                endTime: shiftFormData.endTime
+            });
+
+            if (conflict) {
+                warnings.push(`Conflit d'horaire : ${employee.name} est déjà shifté de ${conflict.startTime} à ${conflict.endTime} ce jour`);
+            }
+
+            // Check for overtime
+            if (wouldExceedMaxHours(shiftsToCheck, employee, {
+                startTime: shiftFormData.startTime,
+                endTime: shiftFormData.endTime
+            })) {
+                const currentHours = calculateWeeklyHours(shiftsToCheck, employee.id);
+                warnings.push(`Heures supplémentaires : ${employee.name} dépassera son quota (${currentHours.toFixed(1)}h / ${employee.maxHoursPerWeek}h)`);
+            }
+
+            // Check for Availabilities/Preferences - only APPROVED availabilities trigger alerts
+            const dayAvails = currentAvailabilities.filter(a => a.employeeId == employee.id && a.date === shiftFormData.date && a.status === 'approved');
+
+            dayAvails.forEach(avail => {
+                if (avail.type === 'repos') {
+                    warnings.push(`⚠️ REPOS : ${employee.name} a demandé un repos pour ce jour.`);
+                } else if (avail.type === 'indispo') {
+                    const [uSH, uSM] = avail.startTime.split(':').map(Number);
+                    const [uEH, uEM] = avail.endTime.split(':').map(Number);
+                    const [sH, sM] = shiftFormData.startTime.split(':').map(Number);
+                    const [eH, eM] = shiftFormData.endTime.split(':').map(Number);
+                    
+                    const endHNorm = eH < sH ? eH + 24 : eH;
+                    const uEndHNorm = uEH < uSH ? uEH + 24 : uEH;
+
+                    const hasOverlap = (sH * 60 + sM) < (uEndHNorm * 60 + uEM) && (endHNorm * 60 + eM) > (uSH * 60 + uSM);
+                    
+                    if (hasOverlap) {
+                        warnings.push(`🚫 INDISPO : ${employee.name} est indisponible de ${avail.startTime} à ${avail.endTime} !`);
+                    } else {
+                        warnings.push(`ℹ️ NOTE : ${employee.name} a une contrainte sur une autre partie du jour (${avail.startTime}-${avail.endTime}).`);
+                    }
+                }
+            });
+        }
+        
+        // Déduplication des messages pour éviter les alertes redondantes
+        const uniqueWarnings = Array.from(new Set(warnings));
+        setValidationWarnings(uniqueWarnings);
+    }, [shiftFormData, showShiftModal, currentAvailabilities, currentEmployees, currentWeekShifts, editingShift]);
+
+
+      // Validate and save shift (create or update)
     const handleSaveShift = () => {
         if (!shiftFormData.employeeId || !shiftFormData.date || !shiftFormData.startTime || !shiftFormData.endTime) {
             alert('Veuillez remplir tous les champs requis');
             return;
         }
 
-        const warnings = [];
         const isVacant = shiftFormData.employeeId === 'vacant' || !shiftFormData.employeeId;
-        const employee = isVacant ? null : currentEmployees.find(e => e.id === parseInt(shiftFormData.employeeId));
-
-        // Check for schedule conflicts (exclude current shift if editing)
-        const shiftsToCheck = editingShift
-            ? currentWeekShifts.filter(s => s.id !== editingShift.id)
-            : currentWeekShifts;
-
-        const conflict = detectScheduleConflict(shiftsToCheck, {
-            employeeId: parseInt(shiftFormData.employeeId),
-            date: shiftFormData.date,
-            startTime: shiftFormData.startTime,
-            endTime: shiftFormData.endTime
-        });
-
-        if (conflict && employee) {
-            warnings.push(`Conflit d'horaire : ${employee.name} est déjà shifté de ${conflict.startTime} à ${conflict.endTime} ce jour`);
+        
+        // Final check on warnings before save (though they are already real-time)
+        if (validationWarnings.length > 0) {
+            // Already handled by UI displaying Forcer la sauvegarde
+            // but double check here if needed
         }
-
-        // Check for overtime (exclude current shift if editing)
-        if (employee && wouldExceedMaxHours(shiftsToCheck, employee, {
-            startTime: shiftFormData.startTime,
-            endTime: shiftFormData.endTime
-        })) {
-            const currentHours = calculateWeeklyHours(shiftsToCheck, employee.id);
-            warnings.push(`Heures supplémentaires : ${employee.name} dépassera son quota (actuellement ${currentHours.toFixed(1)}h / ${employee.maxHoursPerWeek}h)`);
-        }
-
-        if (warnings.length > 0) {
-            setValidationWarnings(warnings);
-            return; // Show warnings, require confirmation
-        }
-
         // Save shift (create or update)
         if (editingShift) {
             // Update existing shift
@@ -242,7 +288,9 @@ const PlanningPage = () => {
 
     // Force save despite warnings
     const handleForceSave = () => {
+        const isVacant = shiftFormData.employeeId === 'vacant' || !shiftFormData.employeeId;
         if (editingShift) {
+
             // Update existing shift
             updateShifts(currentShifts.map(s =>
                 s.id === editingShift.id
@@ -284,14 +332,31 @@ const PlanningPage = () => {
         if (percentage >= 80) status = 'limited'; // red
         else if (percentage >= 50) status = 'moderate'; // yellow
 
+        // Nouveau: Préférences de la semaine
+        const weekAvails = currentAvailabilities.filter(a => a.employeeId === emp.id && a.date >= weekStart && a.date <= weekEnd);
+        // Compter les demandes en attente vs approuvées
+        const pendingRepos = weekAvails.filter(a => a.type === 'repos' && a.status === 'pending');
+        const pendingIndispo = weekAvails.filter(a => a.type === 'indispo' && a.status === 'pending');
+        const reposCount = new Set(weekAvails.filter(a => a.type === 'repos' && a.status === 'approved').map(a => a.date)).size;
+        const indispoCount = new Set(weekAvails.filter(a => a.type === 'indispo' && a.status === 'approved').map(a => a.date)).size;
+
         return {
             ...emp,
             hoursWorked: hours,
             hoursRemaining: remaining,
             percentage: percentage,
-            status: status
+            status: status,
+            reposCount,
+            indispoCount,
+            pendingRepos, // Tableaux complets pour le panneau d'approbation
+            pendingIndispo
         };
-    }).sort((a, b) => b.hoursRemaining - a.hoursRemaining); // Sort by most available first
+    }).sort((a, b) => {
+        // Sort by major preference first, then by remaining hours
+        if (b.reposCount !== a.reposCount) return b.reposCount - a.reposCount;
+        return b.hoursRemaining - a.hoursRemaining;
+    });
+
 
     // Render Logic
     return (
@@ -314,6 +379,7 @@ const PlanningPage = () => {
                         </button>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+
                         <button
                             className="btn-secondary"
                             style={{ padding: '0.5rem 1rem' }}
@@ -329,6 +395,7 @@ const PlanningPage = () => {
                             <Icons.ChevronRight size={18} />
                         </button>
                     </div>
+
                 </div>
             </div>
 
@@ -384,7 +451,45 @@ const PlanningPage = () => {
                                         : `Quota dépassé de ${Math.abs(emp.hoursRemaining).toFixed(1)}h`
                                     }
                                 </div>
+                                {/* Demandes APPROUVÉES (badges simples) */}
+                                {(emp.reposCount > 0 || emp.indispoCount > 0) && (
+                                    <div style={{ marginTop: '6px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                        {emp.reposCount > 0 && <span style={{ fontSize: '0.65rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>✅ {emp.reposCount} Repos</span>}
+                                        {emp.indispoCount > 0 && <span style={{ fontSize: '0.65rem', background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>✅ {emp.indispoCount} Indispo.</span>}
+                                    </div>
+                                )}
+                                {/* Demandes EN ATTENTE d'approbation */}
+                                {(emp.pendingRepos?.length > 0 || emp.pendingIndispo?.length > 0) && (
+                                    <div style={{ marginTop: '8px', borderTop: '1px solid rgba(251,191,36,0.2)', paddingTop: '8px' }}>
+                                        <div style={{ fontSize: '0.6rem', color: '#f59e0b', fontWeight: 700, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            ⏳ DEMANDES EN ATTENTE
+                                        </div>
+                                        {[...( emp.pendingRepos || []), ...(emp.pendingIndispo || [])].map(avail => (
+                                            <div key={avail.id} style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: '8px', padding: '6px 8px', marginBottom: '4px' }}>
+                                                <div style={{ fontSize: '0.65rem', fontWeight: 600, color: '#f1f5f9', marginBottom: '4px' }}>
+                                                    {avail.type === 'repos' ? '🛌 Repos' : `🚫 Indispo (${avail.startTime}–${avail.endTime})`} – {avail.date}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <button
+                                                        onClick={() => approveAvailability(avail.id)}
+                                                        style={{ flex: 1, background: 'rgba(16,185,129,0.15)', border: '1px solid #10b981', color: '#10b981', fontSize: '0.6rem', fontWeight: 700, padding: '3px 6px', borderRadius: '6px', cursor: 'pointer' }}
+                                                    >
+                                                        ✅ Approuver
+                                                    </button>
+                                                    <button
+                                                        onClick={() => rejectAvailability(avail.id)}
+                                                        style={{ flex: 1, background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', color: '#ef4444', fontSize: '0.6rem', fontWeight: 700, padding: '3px 6px', borderRadius: '6px', cursor: 'pointer' }}
+                                                    >
+                                                        ❌ Refuser
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
+
+
                         ))}
                     </div>
                 </div>
@@ -408,8 +513,10 @@ const PlanningPage = () => {
                                 const originalOwner = currentEmployees.find(e => e.id === req.originalEmployeeId);
                                 if (!shift || !requester) return null;
 
+                                const isPartial = req.startTime && req.endTime && (req.startTime !== shift.startTime || req.endTime !== shift.endTime);
+
                                 return (
-                                    <div key={req.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                                    <div key={req.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                             <div>
                                                 <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'capitalize' }}>
@@ -419,10 +526,26 @@ const PlanningPage = () => {
                                                     {shift.startTime} - {shift.endTime}
                                                 </div>
                                             </div>
+                                        {isPartial && (
+                                            <div style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                                                AIDE PARTIELLE
+                                            </div>
+                                        )}
+                                        {!isPartial && (
                                             <div style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
                                                 ÉCHANGE
                                             </div>
+                                        )}
+                                    </div>
+                                    
+                                    {isPartial && (
+                                        <div style={{ margin: '8px 0', padding: '10px', background: 'rgba(139, 92, 246, 0.05)', borderRadius: '8px', borderLeft: '3px solid #8b5cf6' }}>
+                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '2px' }}>Intervalle demandé :</div>
+                                            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'white' }}>
+                                                {req.startTime} - {req.endTime}
+                                            </div>
                                         </div>
+                                    )}
                                         
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderTop: '1px solid var(--border)' }}>
                                             <Users size={16} color="var(--text-muted)" />
@@ -521,7 +644,27 @@ const PlanningPage = () => {
                             <div className="day-header">
                                 <div className="day-name">{date.name}</div>
                                 <div className="day-number">{date.number}</div>
+                                {/* Indicateurs de dispos pour la journée */}
+                                {(() => {
+                                        const dayAvails = currentAvailabilities.filter(a => a.date === date.dateString);
+                                        if (dayAvails.length === 0) return null;
+                                        // On compte le nombre d'EMPLOYÉS uniques ayant un repos ou une indispo
+                                        const repos = new Set(dayAvails.filter(a => a.type === 'repos' && a.status === 'approved').map(a => a.employeeId)).size;
+                                        const indispo = new Set(dayAvails.filter(a => a.type === 'indispo' && a.status === 'approved').map(a => a.employeeId)).size;
+                                        
+                                        if (repos === 0 && indispo === 0) return null;
+                                        
+                                        return (
+                                            <div style={{ display: 'flex', gap: '4px', marginTop: '4px', justifyContent: 'center' }}>
+                                                {repos > 0 && <span title={`${repos} personne(s) en repos`} style={{ background: '#10b981', color: 'white', fontSize: '0.6rem', padding: '1px 4px', borderRadius: '4px', fontWeight: 700 }}>{repos}R</span>}
+                                                {indispo > 0 && <span title={`${indispo} personne(s) indisponible(s)`} style={{ background: '#fbbf24', color: 'black', fontSize: '0.6rem', padding: '1px 4px', borderRadius: '4px', fontWeight: 700 }}>{indispo}I</span>}
+
+                                            </div>
+                                        );
+
+                                })()}
                             </div>
+
 
                             <div className="day-content" style={{ position: 'relative', height: '100%', minHeight: '800px', overflow: 'visible' }}>
                                 {/* Background Grid Lines 7h-02h (only for week view) */}
@@ -710,10 +853,11 @@ const PlanningPage = () => {
                                     );
                                 })()}
 
-                                {getVacantTimeSlots(currentRestaurant.openingTime, currentRestaurant.closingTime, dayShifts).map((vacant, vIdx) => {
+                                {getVacantTimeSlots(dayShifts, date.dateString, currentRestaurant).map((vacant, vIdx) => {
                                     // Pour les slots virtuels, on utilise toujours dayShifts pour le calcul (ou mieux, allVisibleCards)
                                     // Mais les virtual n'overlap jamais entre eux normalement.
-                                    const style = getShiftStyle(vacant, [...dayShifts, ...getVacantTimeSlots(currentRestaurant.openingTime, currentRestaurant.closingTime, dayShifts).map((v, i) => ({ ...v, id: `v-${i}` }))]);
+                                    const style = getShiftStyle(vacant, [...dayShifts, ...getVacantTimeSlots(dayShifts, date.dateString, currentRestaurant).map((v, i) => ({ ...v, id: `v-${i}` }))]);
+
                                     return (
                                         <div
                                             key={`vacant-${vIdx}`}
@@ -795,9 +939,19 @@ const PlanningPage = () => {
                                 onChange={(e) => setShiftFormData({ ...shiftFormData, employeeId: e.target.value })}
                             >
                                 <option value="vacant">-- Poste Libre (Besoin) --</option>
-                                {currentEmployees.map(emp => (
-                                    <option key={emp.id} value={emp.id}>{emp.name} - {emp.role}</option>
-                                ))}
+                                {currentEmployees.map(emp => {
+                                    const dayAvails = currentAvailabilities.filter(a => a.employeeId == emp.id && a.date === shiftFormData.date);
+                                    const hasRepos = dayAvails.some(a => a.type === 'repos');
+                                    const hasIndispo = dayAvails.some(a => a.type === 'indispo');
+                                    const label = `${emp.name} - ${emp.role}${hasRepos ? ' (REPOS ⚠️)' : hasIndispo ? ' (INDISPO ⚠️)' : ''}`;
+                                    
+                                    return (
+                                        <option key={emp.id} value={emp.id}>
+                                            {label}
+                                        </option>
+                                    );
+                                })}
+
                             </select>
                         </div>
 

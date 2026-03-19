@@ -6,10 +6,39 @@ import { fr } from 'date-fns/locale';
 import { getVacantTimeSlots } from '../../utils/calculations';
 
 const EmployeeDashboard = () => {
-    const { currentRestaurant, employees, currentRestaurantId, currentShifts, currentEmployeeId, logout, offerShift, takeShift, claimVacantShift, shiftRequests } = useData();
+    const {
+        currentRestaurant, employees, currentRestaurantId, currentShifts,
+        currentEmployeeId, logout, offerShift, takeShift, claimVacantShift,
+        shiftRequests, currentAvailabilities, updateAvailability, deleteAvailability, refreshData
+    } = useData();
+
     const [currentDate, setCurrentDate] = useState(new Date());
     const [activeTab, setActiveTab] = useState('planning'); // 'planning' | 'dispos' | 'profil' | 'bourse'
     const [actionLoading, setActionLoading] = useState(false);
+
+    // États pour le calendrier de dispos
+    const [disposView, setDisposView] = useState('week'); // 'week' | 'month'
+    const [disposDate, setDisposDate] = useState(new Date());
+    const [selectedDateForAction, setSelectedDateForAction] = useState(null);
+    const [localType, setLocalType] = useState(null);
+    const [localStart, setLocalStart] = useState('08:00');
+    const [localEnd, setLocalEnd] = useState('12:00');
+    const [localNote, setLocalNote] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [partialShiftSelection, setPartialShiftSelection] = useState(null); // { shiftId, date, startTime, endTime }
+
+
+    // Initialiser le formulaire quand on sélectionne une date
+    React.useEffect(() => {
+        if (selectedDateForAction) {
+            const dayAvail = currentAvailabilities.find(a => a.date === selectedDateForAction && a.employeeId === currentEmployeeId);
+            setLocalType(dayAvail?.type || null);
+            setLocalStart(dayAvail?.startTime || '08:00');
+            setLocalEnd(dayAvail?.endTime || '12:00');
+            setLocalNote(dayAvail?.note || '');
+        }
+    }, [selectedDateForAction, currentAvailabilities, currentEmployeeId]);
+
 
     // Récupérer les infos de l'employé connecté
     const me = useMemo(() => {
@@ -34,7 +63,7 @@ const EmployeeDashboard = () => {
     const renderPlanning = () => {
         // Obtenir tous les shifts vacants pour la semaine
         const vacantShifts = currentShifts.filter(s => (s.employeeId === null || s.employeeId === undefined) && s.date >= format(weekStart, 'yyyy-MM-dd') && s.date <= format(addDays(weekStart, 6), 'yyyy-MM-dd'));
-        
+
         // Helper: même logique que PlanningPage pour le positionnement
         const getShiftStyle = (shift, allVisibleCards) => {
             const startHour = 7;
@@ -97,12 +126,12 @@ const EmployeeDashboard = () => {
                 </div>
 
                 {/* Grille de Planning (Style Desktop Adapté) */}
-                <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(7, 1fr)', 
-                    gap: '1px', 
-                    background: 'rgba(255,255,255,0.05)', 
-                    borderRadius: '16px', 
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(7, 1fr)',
+                    gap: '1px',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '16px',
                     overflow: 'hidden',
                     border: '1px solid rgba(255,255,255,0.1)',
                     minHeight: '700px'
@@ -110,7 +139,7 @@ const EmployeeDashboard = () => {
                     {weekDays.map((day, idx) => {
                         const dateStr = format(day, 'yyyy-MM-dd');
                         const isTodayFlag = isToday(day);
-                        
+
                         // Mes shifts
                         const myShifts = myShiftsThisWeek.filter(s => s.date === dateStr);
                         // Les besoins (vacants groupés)
@@ -132,16 +161,16 @@ const EmployeeDashboard = () => {
                         const allVisible = [...myShifts, ...groupedVacant];
 
                         return (
-                            <div key={idx} style={{ 
+                            <div key={idx} style={{
                                 background: isTodayFlag ? 'rgba(99, 102, 241, 0.03)' : 'var(--bg-card)',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 position: 'relative'
                             }}>
                                 {/* Header Jour */}
-                                <div style={{ 
-                                    padding: '12px 4px', 
-                                    textAlign: 'center', 
+                                <div style={{
+                                    padding: '12px 4px',
+                                    textAlign: 'center',
                                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                                     background: isTodayFlag ? 'var(--primary)' : 'transparent',
                                 }}>
@@ -177,13 +206,19 @@ const EmployeeDashboard = () => {
 
                                     {/* Besoins */}
                                     {groupedVacant.map(group => (
-                                        <div 
-                                            key={group.id} 
+                                        <div
+                                            key={group.id}
                                             onClick={() => {
-                                                if (window.confirm(`Proposer mon aide pour ce créneau de ${group.startTime} à ${group.endTime} ?`)) {
-                                                    takeShift(group.ids[0], currentEmployeeId, dateStr);
-                                                }
+                                                setPartialShiftSelection({
+                                                    shiftId: group.ids[0],
+                                                    date: dateStr,
+                                                    startTime: group.startTime,
+                                                    endTime: group.endTime,
+                                                    originalStart: group.startTime,
+                                                    originalEnd: group.endTime
+                                                });
                                             }}
+
                                             style={{
                                                 ...getShiftStyle(group, allVisible),
                                                 background: 'rgba(139, 92, 246, 0.1)',
@@ -238,8 +273,8 @@ const EmployeeDashboard = () => {
                                             borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                                         }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ 
-                                                    width: 32, height: 32, borderRadius: '50%', 
+                                                <div style={{
+                                                    width: 32, height: 32, borderRadius: '50%',
                                                     background: isApproved ? 'rgba(16, 185, 129, 0.1)' : isRejected ? 'rgba(239, 68, 68, 0.1)' : 'rgba(99, 102, 241, 0.1)',
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                                                 }}>
@@ -269,9 +304,13 @@ const EmployeeDashboard = () => {
 
     const renderBourse = () => {
         // Obtenir tous les shifts 'offered' OU sans employé (vacants réels)
-        const offeredShifts = currentShifts.filter(s => 
-            (s.status === 'offered' || s.employeeId === null) && s.employeeId !== currentEmployeeId
+        const todayStr = new Date().toISOString().split('T')[0];
+        const offeredShifts = currentShifts.filter(s =>
+            (s.status === 'offered' || s.employeeId === null) &&
+            s.employeeId !== currentEmployeeId &&
+            s.date >= todayStr
         );
+
 
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -285,10 +324,16 @@ const EmployeeDashboard = () => {
                         <LogOut size={16} color="var(--primary)" /> Offrir l'un de mes shifts
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {myShiftsThisWeek.length === 0 ? (
-                            <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Aucun shift prévu pour le moment.</p>
-                        ) : (
-                            myShiftsThisWeek.map(shift => (
+                        {(() => {
+                            const todayStr = new Date().toISOString().split('T')[0];
+                            const futureShifts = myShiftsThisWeek.filter(s => s.date >= todayStr);
+
+                            if (futureShifts.length === 0) {
+                                return <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Aucun shift futur à proposer.</p>;
+                            }
+
+                            return futureShifts.map(shift => (
+
                                 <div key={shift.id} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <div style={{ color: '#f1f5f9', fontSize: '0.9rem', fontWeight: 600 }}>{format(new Date(shift.date), 'EEE d MMM', { locale: fr })}</div>
@@ -297,7 +342,7 @@ const EmployeeDashboard = () => {
                                     {shift.status === 'offered' ? (
                                         <span style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 600 }}>Déjà proposé</span>
                                     ) : (
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 if (window.confirm("Proposer ce shift à l'équipe ?")) offerShift(shift.id);
                                             }}
@@ -308,7 +353,7 @@ const EmployeeDashboard = () => {
                                     )}
                                 </div>
                             ))
-                        )}
+                        })()}
                     </div>
                 </div>
 
@@ -350,16 +395,29 @@ const EmployeeDashboard = () => {
                                             </div>
                                         ) : (
                                             <button
-                                                onClick={async () => {
-                                                    if (window.confirm(`Voulez-vous récupérer ce shift ? Le manager devra valider votre demande.`)) {
-                                                        setActionLoading(true);
-                                                        try {
-                                                            await takeShift(shift.id, currentEmployeeId, shift.date);
-                                                            alert("Demande envoyée !");
-                                                        } catch (e) { alert("Erreur lors de la prise du shift"); }
-                                                        setActionLoading(false);
+                                                onClick={() => {
+                                                    if (!shift.employeeId) {
+
+                                                        // Pour un besoin vacant, on propose l'aide partielle
+                                                        setPartialShiftSelection({
+                                                            shiftId: shift.id,
+                                                            date: shift.date,
+                                                            startTime: shift.startTime,
+                                                            endTime: shift.endTime,
+                                                            originalStart: shift.startTime,
+                                                            originalEnd: shift.endTime
+                                                        });
+                                                    } else {
+                                                        if (window.confirm(`Voulez-vous récupérer ce shift ? Le manager devra valider votre demande.`)) {
+                                                            setActionLoading(true);
+                                                            takeShift(shift.id, currentEmployeeId, shift.date)
+                                                                .then(() => alert("Demande envoyée !"))
+                                                                .catch(e => alert("Erreur lors de la prise du shift"))
+                                                                .finally(() => setActionLoading(false));
+                                                        }
                                                     }
                                                 }}
+
                                                 disabled={actionLoading}
                                                 style={{
                                                     background: 'var(--primary)', border: 'none', color: 'white', width: '100%',
@@ -380,18 +438,371 @@ const EmployeeDashboard = () => {
         );
     };
 
-    const renderDispos = () => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center' }}>
-            <div style={{ width: 64, height: 64, background: 'rgba(245,158,11,0.1)', color: '#fbbf24', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                <Clock size={32} />
+    const renderDispos = () => {
+        // Helpers de date (similaires à PlanningPage)
+
+        const getWeekDates = (date) => {
+            const start = startOfWeek(date, { weekStartsOn: 1 });
+            return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+        };
+
+        const getMonthDates = (date) => {
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const start = startOfWeek(firstDay, { weekStartsOn: 1 });
+            return Array.from({ length: 42 }).map((_, i) => addDays(start, i));
+        };
+
+        const displayDates = disposView === 'week' ? getWeekDates(disposDate) : getMonthDates(disposDate);
+
+        const handleDisposNav = (direction) => {
+            if (disposView === 'week') setDisposDate(addDays(disposDate, direction * 7));
+            else {
+                const newDate = new Date(disposDate);
+                newDate.setMonth(disposDate.getMonth() + direction);
+                setDisposDate(newDate);
+            }
+        };
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }}>
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div>
+                        <h2 style={{ color: '#f1f5f9', fontSize: '1.3rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Clock color="#fbbf24" /> Mes Disponibilités
+                        </h2>
+                        <div style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '4px', textTransform: 'capitalize' }}>
+                            {disposView === 'week'
+                                ? `Semaine du ${format(startOfWeek(disposDate, { weekStartsOn: 1 }), 'd MMMM', { locale: fr })}`
+                                : format(disposDate, 'MMMM yyyy', { locale: fr })
+                            }
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '2px' }}>
+                            <button
+                                onClick={() => setDisposView('week')}
+                                style={{
+                                    background: disposView === 'week' ? 'var(--primary)' : 'transparent',
+                                    border: 'none', color: 'white', padding: '4px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
+                                }}
+                            >
+                                Semaine
+                            </button>
+                            <button
+                                onClick={() => setDisposView('month')}
+                                style={{
+                                    background: disposView === 'month' ? 'var(--primary)' : 'transparent',
+                                    border: 'none', color: 'white', padding: '4px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
+                                }}
+                            >
+                                Mois
+                            </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                            <button onClick={() => handleDisposNav(-1)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}><ChevronLeft size={18} /></button>
+                            <button onClick={() => handleDisposNav(1)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}><ChevronRight size={18} /></button>
+                        </div>
+                    </div>
+                </header>
+
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(7, 1fr)',
+                    gap: '1px',
+                    background: 'rgba(255,255,255,0.1)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                    {/* Header Jours */}
+                    {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(d => (
+                        <div key={d} style={{ background: 'rgba(30,41,59,0.5)', padding: '8px', textAlign: 'center', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>
+                            {d}
+                        </div>
+                    ))}
+
+                    {/* Grille */}
+                    {displayDates.map((day, i) => {
+                        const dateStr = format(day, 'yyyy-MM-dd');
+                        const dayAvails = currentAvailabilities.filter(a => a.date === dateStr && a.employeeId === currentEmployeeId);
+                        const isRepos = dayAvails.some(a => a.type === 'repos');
+                        const isIndispo = dayAvails.some(a => a.type === 'indispo');
+                        const isCurrentMonth = day.getMonth() === disposDate.getMonth();
+                        const isTodayFlag = isToday(day);
+
+                        const handleQuickRepos = async (e) => {
+                            e.stopPropagation();
+                            try {
+                                if (isRepos) {
+                                    // Supprimer tous les repos et indispos de ce jour
+                                    for (const a of dayAvails) {
+                                        await deleteAvailability(a.id);
+                                    }
+                                } else {
+                                    await updateAvailability({ employeeId: currentEmployeeId, date: dateStr, type: 'repos' });
+                                }
+                            } catch (err) {
+                                alert("Erreur lors de la mise à jour des disponibilités.");
+                            }
+                        };
+
+                        const handleQuickIndispo = async (e) => {
+                            e.stopPropagation();
+                            try {
+                                if (isIndispo) {
+                                    // Supprimer toutes les indispos
+                                    for (const a of dayAvails) {
+                                        await deleteAvailability(a.id);
+                                    }
+                                } else {
+                                    await updateAvailability({ employeeId: currentEmployeeId, date: dateStr, type: 'indispo', startTime: '08:00', endTime: '12:00' });
+                                }
+                            } catch (err) {
+                                alert("Erreur lors de la mise à jour des disponibilités.");
+                            }
+                        };
+
+
+
+                        return (
+                            <div
+                                key={i}
+                                onClick={() => setSelectedDateForAction(dateStr)}
+                                style={{
+                                    background: isRepos ? 'rgba(16, 185, 129, 0.15)' : (isIndispo ? 'rgba(251, 191, 36, 0.15)' : (isTodayFlag ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-card)')),
+                                    aspectRatio: disposView === 'month' ? '1/1' : 'auto',
+                                    minHeight: disposView === 'week' ? '120px' : '64px',
+                                    padding: '8px',
+                                    opacity: (disposView === 'month' && !isCurrentMonth) ? 0.3 : 1,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '6px',
+                                    position: 'relative',
+                                    transition: '0.2s',
+                                    border: isTodayFlag ? '1px solid var(--primary)' : (isRepos ? '1px solid rgba(16,185,129,0.3)' : (isIndispo ? '1px solid rgba(251,191,36,0.3)' : '1px solid transparent')),
+                                    borderRadius: '4px'
+                                }}
+                            >
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: isTodayFlag ? 'var(--primary)' : '#f1f5f9' }}>
+                                        {format(day, 'd')}
+                                    </div>
+                                    {disposView === 'week' && (
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            <button
+                                                onClick={handleQuickRepos}
+                                                style={{
+                                                    background: isRepos ? '#10b981' : 'rgba(255,255,255,0.05)',
+                                                    border: 'none', color: isRepos ? 'white' : '#64748b',
+                                                    width: '20px', height: '20px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer'
+                                                }}
+                                                title="Repos"
+                                            >R</button>
+                                            <button
+                                                onClick={handleQuickIndispo}
+                                                style={{
+                                                    background: isIndispo ? '#fbbf24' : 'rgba(255,255,255,0.05)',
+                                                    border: 'none', color: isIndispo ? 'black' : '#64748b',
+                                                    width: '20px', height: '20px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer'
+                                                }}
+                                                title="Indispo"
+                                            >I</button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {isRepos && (() => {
+                                        const reposEntry = dayAvails.find(a => a.type === 'repos');
+                                        const status = reposEntry?.status || 'pending';
+                                        const statusLabel = status === 'approved' ? '✅' : status === 'rejected' ? '❌' : '⏳';
+                                        const statusBg = status === 'approved' ? '#10b981' : status === 'rejected' ? '#ef4444' : '#f59e0b';
+                                        return (
+                                            <div style={{ background: statusBg, color: 'white', fontSize: '0.6rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 700 }}>
+                                                {statusLabel} REPOS
+                                            </div>
+                                        );
+                                    })()}
+                                    {isIndispo && (() => {
+                                        const indispoEntry = dayAvails.find(a => a.type === 'indispo');
+                                        const status = indispoEntry?.status || 'pending';
+                                        const statusLabel = status === 'approved' ? '✅' : status === 'rejected' ? '❌' : '⏳';
+                                        const statusBg = status === 'approved' ? '#f59e0b' : status === 'rejected' ? '#ef4444' : '#78716c';
+                                        return (
+                                            <div style={{ background: statusBg, color: status === 'approved' ? 'black' : 'white', fontSize: '0.6rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 700 }}>
+                                                {statusLabel} INDISPO
+                                                <div style={{ fontSize: '0.5rem', opacity: 0.8 }}>{indispoEntry?.startTime}-{indispoEntry?.endTime}</div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+
+                                {disposView === 'month' && (isRepos || isIndispo) && (() => {
+                                    const mainEntry = dayAvails[0];
+                                    const status = mainEntry?.status || 'pending';
+                                    const dotColor = status === 'approved' ? (isRepos ? '#10b981' : '#fbbf24') : status === 'rejected' ? '#ef4444' : '#f59e0b';
+                                    return <div style={{ position: 'absolute', bottom: 4, right: 4, width: 6, height: 6, borderRadius: '50%', background: dotColor }} />;
+                                })()}
+
+                            </div>
+                        );
+                    })}
+                </div>
+
+
+                {/* Modal d'Action Rapide */}
+                {selectedDateForAction && (() => {
+                    const date = new Date(selectedDateForAction);
+                    const dayAvails = currentAvailabilities.filter(a => a.date === selectedDateForAction && a.employeeId === currentEmployeeId);
+                    const mainAvail = dayAvails[0]; // On garde la première pour l'ID d'update si besoin
+
+                    const handleSave = async () => {
+                        setIsSaving(true);
+                        try {
+                            if (!localType) {
+                                // Supprimer TOUT pour ce jour
+                                for (const a of dayAvails) {
+                                    await deleteAvailability(a.id);
+                                }
+                            } else {
+                                // Si c'est un REPOS, updateAvailability s'occupe déjà de nettoyer les autres.
+                                // Si c'est une INDISPO, on pourrait vouloir en rajouter plusieurs, 
+                                // mais l'UI actuelle n'en gère qu'une seule à la fois via cette modale.
+                                await updateAvailability({
+                                    id: mainAvail?.id,
+                                    employeeId: currentEmployeeId,
+                                    date: selectedDateForAction,
+                                    type: localType,
+                                    startTime: localType === 'indispo' ? localStart : null,
+                                    endTime: localType === 'indispo' ? localEnd : null,
+                                    note: localNote
+                                });
+                            }
+                            setSelectedDateForAction(null);
+                        } catch (err) {
+                            console.error("Erreur de sauvegarde:", err);
+                            alert(`Erreur de sauvegarde : ${err.message || "Erreur lors de l'enregistrement."}`);
+                        } finally {
+                            setIsSaving(false);
+                        }
+                    };
+
+
+                    return (
+                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                            <div style={{ background: 'var(--bg-card)', width: '100%', maxWidth: '400px', borderRadius: '24px', padding: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                    <div>
+                                        <h3 style={{ color: 'white', margin: 0, textTransform: 'capitalize' }}>{format(date, 'EEEE d MMMM', { locale: fr })}</h3>
+                                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '4px 0 0 0' }}>Modifier ma disponibilité</p>
+                                    </div>
+                                    <button onClick={() => setSelectedDateForAction(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    <button
+                                        onClick={() => setLocalType(localType === 'repos' ? null : 'repos')}
+                                        style={{ width: '100%', background: localType === 'repos' ? '#10b981' : 'rgba(255,255,255,0.05)', color: 'white', border: 'none', padding: '16px', borderRadius: '12px', fontWeight: 600, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, transition: '0.2s' }}
+                                    >
+                                        <div style={{ width: 12, height: 12, background: '#10b981', borderRadius: '50%', opacity: localType === 'repos' ? 1 : 0.3 }} /> Repos souhaité
+                                    </button>
+
+                                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '16px', border: localType === 'indispo' ? '1px solid #fbbf24' : '1px solid transparent' }}>
+                                        <button
+                                            onClick={() => setLocalType(localType === 'indispo' ? null : 'indispo')}
+                                            style={{ width: '100%', background: 'none', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, marginBottom: localType === 'indispo' ? '12px' : '0' }}
+                                        >
+                                            <div style={{ width: 12, height: 12, background: '#fbbf24', borderRadius: '50%', opacity: localType === 'indispo' ? 1 : 0.3 }} /> Indisponibilité
+                                        </button>
+
+                                        {localType === 'indispo' && (
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <label style={{ fontSize: '0.7rem', color: '#94a3b8' }}>De</label>
+                                                    <input
+                                                        type="time"
+                                                        value={localStart}
+                                                        onChange={(e) => setLocalStart(e.target.value)}
+                                                        style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '6px' }}
+                                                    />
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <label style={{ fontSize: '0.7rem', color: '#94a3b8' }}>À</label>
+                                                    <input
+                                                        type="time"
+                                                        value={localEnd}
+                                                        onChange={(e) => setLocalEnd(e.target.value)}
+                                                        style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '8px', borderRadius: '6px' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div style={{ marginTop: '8px' }}>
+                                        <label style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', marginBottom: 4 }}>Note / Raison</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ex: Rendez-vous médical..."
+                                            value={localNote}
+                                            onChange={(e) => setLocalNote(e.target.value)}
+                                            style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '12px', borderRadius: '12px' }}
+                                        />
+                                    </div>
+
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={isSaving}
+                                        style={{ marginTop: '16px', width: '100%', background: 'var(--primary)', color: 'white', border: 'none', padding: '16px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}
+                                    >
+                                        {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                                    </button>
+
+                                    {/* Bouton de suppression visible uniquement s'il existe déjà une demande */}
+                                    {dayAvails.length > 0 && (
+                                        <button
+                                            onClick={async () => {
+                                                setIsSaving(true);
+                                                try {
+                                                    for (const a of dayAvails) {
+                                                        await deleteAvailability(a.id);
+                                                    }
+                                                    setSelectedDateForAction(null);
+                                                } catch (err) {
+                                                    alert(`Erreur : ${err.message}`);
+                                                } finally {
+                                                    setIsSaving(false);
+                                                }
+                                            }}
+                                            disabled={isSaving}
+                                            style={{ marginTop: '8px', width: '100%', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}
+                                        >
+                                            🗑️ Retirer ma demande
+                                        </button>
+                                    )}
+                                </div>
+
+                            </div>
+                        </div>
+                    );
+                })()}
+
+
+                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '12px', display: 'flex', gap: '16px', fontSize: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 10, height: 10, background: '#10b981', borderRadius: '2px' }} /> Repos</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 10, height: 10, background: '#fbbf24', borderRadius: '2px' }} /> Indisponibilité</div>
+                </div>
             </div>
-            <h2 style={{ color: '#f1f5f9', fontSize: '1.3rem', fontWeight: 700 }}>Mes Disponibilités</h2>
-            <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: 1.5 }}>
-                Bientôt, vous pourrez indiquer ici vos jours de repos souhaités et vos indisponibilités.
-                Elles remonteront directement au manager lors de la création du planning.
-            </p>
-        </div>
-    );
+        );
+    };
+
+
 
     const renderProfil = () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -458,6 +869,80 @@ const EmployeeDashboard = () => {
                 {activeTab === 'bourse' && renderBourse()}
                 {activeTab === 'dispos' && renderDispos()}
                 {activeTab === 'profil' && renderProfil()}
+
+                {/* Modal Aide Partielle */}
+                {partialShiftSelection && (
+                    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                        <div className="modal-content" style={{ background: '#1e293b', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                <h3 style={{ color: 'white', fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Proposer mon aide</h3>
+                                <button onClick={() => setPartialShiftSelection(null)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}><X size={20} /></button>
+                            </div>
+
+                            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '20px' }}>
+                                Vous pouvez prendre tout ou partie de ce besoin ({partialShiftSelection.originalStart} - {partialShiftSelection.originalEnd}).
+                            </p>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.75rem', marginBottom: '4px' }}>Début</label>
+                                        <input
+                                            type="time"
+                                            value={partialShiftSelection.startTime}
+                                            onChange={(e) => setPartialShiftSelection(prev => ({ ...prev, startTime: e.target.value }))}
+                                            style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.75rem', marginBottom: '4px' }}>Fin</label>
+                                        <input
+                                            type="time"
+                                            value={partialShiftSelection.endTime}
+                                            onChange={(e) => setPartialShiftSelection(prev => ({ ...prev, endTime: e.target.value }))}
+                                            style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px' }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button
+                                    onClick={() => setPartialShiftSelection(null)}
+                                    style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'white', cursor: 'pointer' }}
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        setActionLoading(true);
+                                        try {
+                                            await takeShift(
+                                                partialShiftSelection.shiftId,
+                                                currentEmployeeId,
+                                                partialShiftSelection.date,
+                                                partialShiftSelection.startTime,
+                                                partialShiftSelection.endTime
+                                            );
+                                            alert("Demande d'aide envoyée !");
+                                            setPartialShiftSelection(null);
+                                            await refreshData();
+
+                                        } catch (e) {
+                                            alert("Erreur lors de l'envoi de la demande.");
+                                        } finally {
+                                            setActionLoading(false);
+                                        }
+                                    }}
+                                    disabled={actionLoading}
+                                    style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 600, cursor: 'pointer', opacity: actionLoading ? 0.7 : 1 }}
+                                >
+                                    {actionLoading ? 'Envoi...' : 'Confirmer'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
 
             {/* Bottom Navigation Bar (Mobile Style) */}

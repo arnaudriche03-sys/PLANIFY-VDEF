@@ -30,7 +30,8 @@ const parseAIResponse = (rawText) => {
 
 export const useClaude = () => {
     const [isAILoading, setIsAILoading] = useState(false);
-    const { currentRestaurant, currentEmployees, currentShifts, currentRevenueData } = useData();
+    const { currentRestaurant, currentEmployees, currentShifts, currentRevenueData, currentAvailabilities, shiftRequests } = useData();
+
 
     const buildEnrichedContext = () => {
         try {
@@ -66,7 +67,8 @@ export const useClaude = () => {
             currentShifts.forEach(s => {
                 const emp = currentEmployees.find(e => e.id === s.employeeId);
                 const taux = emp?.hourlyRate || 0;
-                const split = splitShiftHours(s, taux);
+                const split = splitShiftHours(s, taux, currentRestaurant);
+
                 if (!heuresParEmploye[s.employeeId]) {
                     heuresParEmploye[s.employeeId] = 0;
                     heuresNuitParEmploye[s.employeeId] = 0;
@@ -97,8 +99,9 @@ export const useClaude = () => {
                     heures_contrat_semaine: e.maxHoursPerWeek,
                     taux_horaire_brut: tauxHoraire > 0 ? `${tauxHoraire}€/h` : 'non renseigné',
                     heures_planifiees: heuresPlanifiees,
-                    dont_heures_nuit_22h_7h: heuresNuit > 0 ? `${heuresNuit}h (+10% CCN HCR)` : '0h',
-                    dont_heures_dimanche: heuresDimanche > 0 ? `${heuresDimanche}h (+10% CCN HCR)` : '0h',
+                    dont_heures_nuit_22h_7h: heuresNuit > 0 ? `${heuresNuit}h (+${currentRestaurant?.nightBonusPct || 10}% réglages restaurant)` : '0h',
+                    dont_heures_dimanche: heuresDimanche > 0 ? `${heuresDimanche}h (+${currentRestaurant?.sundayBonusPct || 10}% réglages restaurant)` : '0h',
+
                     ecart_vs_contrat: ecartContrat,
                     cout_brut_estime_avec_majorations: coutBrut > 0 ? `${Math.round(coutBrut * 100) / 100}€` : 'non calculable',
                     cout_charge_estime: coutChargeEstime !== null ? `${coutChargeEstime}€` : 'non calculable',
@@ -118,7 +121,8 @@ export const useClaude = () => {
             const shiftsEnrichis = currentShifts.map(s => {
                 const emp = employeeMap[s.employeeId];
                 const taux = emp?.hourlyRate || 0;
-                const split = splitShiftHours(s, taux);
+                const split = splitShiftHours(s, taux, currentRestaurant);
+
 
                 let jourFr = '';
                 if (s.date) {
@@ -241,6 +245,42 @@ export const useClaude = () => {
             const planningPeriod = planningStart ? `${planningStart} → ${planningEnd}` : 'Aucun shift planifié';
             const isSameWeek = planningStart >= fmt(monday) && planningStart <= fmt(sunday);
 
+            // ── Disponibilités et Repos des Salariés ─────────────────────────────
+            const disponibilites_employes = currentEmployees.map(e => {
+                const empAvails = (currentAvailabilities || []).filter(a => a.employeeId === e.id);
+                const reposApprouves = empAvails.filter(a => a.type === 'repos' && a.status === 'approved').map(a => a.date);
+                const reposEnAttente = empAvails.filter(a => a.type === 'repos' && a.status === 'pending').map(a => a.date);
+                const reposRefuses = empAvails.filter(a => a.type === 'repos' && a.status === 'rejected').map(a => a.date);
+                const indisposApprouvees = empAvails.filter(a => a.type === 'indispo' && a.status === 'approved').map(a => ({
+                    date: a.date, de: a.startTime, a: a.endTime, note: a.note || null
+                }));
+                const indisposEnAttente = empAvails.filter(a => a.type === 'indispo' && a.status === 'pending').map(a => ({
+                    date: a.date, de: a.startTime, a: a.endTime, note: a.note || null
+                }));
+                if (empAvails.length === 0) return null;
+                return {
+                    nom: e.name,
+                    id: e.id,
+                    repos_approuves: reposApprouves,
+                    repos_en_attente: reposEnAttente,
+                    repos_refuses: reposRefuses,
+                    indispos_approuvees: indisposApprouvees,
+                    indispos_en_attente: indisposEnAttente,
+                };
+            }).filter(Boolean);
+
+            // ── Demandes de Shifts en Attente ─────────────────────────────────────
+            const demandes_shift_en_attente = (shiftRequests || []).filter(r => r.status === 'pending').map(r => {
+                const emp = currentEmployees.find(e => e.id === r.employeeId);
+                return {
+                    employe: emp ? emp.name : `ID:${r.employeeId}`,
+                    date: r.date,
+                    de: r.startTime,
+                    a: r.endTime,
+                    note: r.note || null,
+                };
+            });
+
             const context = {
                 date_aujourdhui: fmt(today),
                 semaine_courante: semaineCourante,
@@ -257,12 +297,13 @@ export const useClaude = () => {
                     total_heures_nuit_22h_7h: Math.round(Object.values(heuresNuitParEmploye).reduce((a, b) => a + b, 0) * 10) / 10,
                     total_heures_dimanche: Math.round(Object.values(heuresDimParEmploye).reduce((a, b) => a + b, 0) * 10) / 10,
                     alerte_majorations: [
-                        ...(aNuitCeSemaine ? ['Heures de nuit (22h-7h) planifiées : majoration +10% appliquée'] : []),
-                        ...(aDimancheCeSemaine ? ['Heures du dimanche planifiées : majoration +10% appliquée'] : []),
+                        ...(aNuitCeSemaine ? [`Heures de nuit (22h-7h) planifiées : majoration +${currentRestaurant?.nightBonusPct || 10}% appliquée`] : []),
+                        ...(aDimancheCeSemaine ? [`Heures du dimanche planifiées : majoration +${currentRestaurant?.sundayBonusPct || 10}% appliquée`] : []),
                     ],
                     cout_total_charge_estime: coutTotalSemaine > 0 ? `${coutTotalSemaine}€ (majorations nuit/dim. incluses)` : 'non calculable (taux manquants)',
                     note_rmo: 'CA non fourni — RMO non calculable. Demandez le CA pour obtenir le ratio.',
                 },
+
                 employes,
                 planning_detaille: shiftsEnrichis,
                 rapport_conformite_hcr: {
@@ -270,6 +311,9 @@ export const useClaude = () => {
                     statut: violations.length === 0 ? 'Conformité validée' : `${violations.length} violation(s) détectée(s)`,
                     violations,
                 },
+                disponibilites_employes,
+                note_disponibilites: 'Les repos/indispos APPROUVÉS sont confirmés. Les EN_ATTENTE sont à valider par le manager. Prends-les en compte dans tes recommandations de planning.',
+                demandes_shift_en_attente,
                 kpis_economiques: (() => {
                     // Chercher le CA pour la semaine du planning chargé
                     const caEntry = planningStart ? currentRevenueData[planningStart] : null;
@@ -470,8 +514,9 @@ ${JSON.stringify(contextData, null, 2)}
                 ? aggregateRevenue(prevPeriodStart, prevPeriodEnd)
                 : currentRevenueData[prevPeriodStart] || null;
 
-            const metrics = calculatePerformanceMetrics(shiftsCurrentPeriod, currentEmployees, revCurrent);
-            const prevMetrics = calculatePerformanceMetrics(shiftsPrevPeriod, currentEmployees, revPrev);
+            const metrics = calculatePerformanceMetrics(shiftsCurrentPeriod, currentEmployees, revCurrent, 0, currentRestaurant);
+            const prevMetrics = calculatePerformanceMetrics(shiftsPrevPeriod, currentEmployees, revPrev, 0, currentRestaurant);
+
 
             // Stocker la période réelle pour l'UI
             metrics.weekStart = periodStart;

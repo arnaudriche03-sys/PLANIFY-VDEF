@@ -7,7 +7,7 @@ import { splitShiftHours } from '../utils/calculations';
 const PrepaiePage = () => {
     const { currentEmployees, currentShifts, currentRestaurant } = useData();
     const [prepaieView, setPrepaieView] = useState('week');
-    const [prepaieDate, setPrepaieDate] = useState(new Date(2026, 1, 4));
+    const [prepaieDate, setPrepaieDate] = useState(new Date());
 
     // ── Helper : formate une date en YYYY-MM-DD en heure LOCALE (évite le décalage UTC+1) ──
     const toLocalDateString = (d) => {
@@ -99,7 +99,8 @@ const PrepaiePage = () => {
         let coutBrut = 0;
 
         employeeShifts.forEach(shift => {
-            const split = splitShiftHours(shift, employee.hourlyRate || 0);
+            const split = splitShiftHours(shift, employee.hourlyRate || 0, currentRestaurant);
+
             heuresJour += split.heuresJour;
             heuresNuit += split.heuresNuit;
             heuresDimanche += split.heuresDimanche;
@@ -228,11 +229,12 @@ const PrepaiePage = () => {
                 fontSize: '0.82rem',
                 color: 'var(--text-secondary)',
             }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Scale size={14} /> CCN HCR — Majorations appliquées :</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Moon size={14} color="#f59e0b" /> Heures de nuit (22h → 7h) : <strong style={{ color: '#f59e0b' }}>+10%</strong></span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Sun size={14} color="#10b981" /> Dimanche : <strong style={{ color: '#10b981' }}>+10%</strong></span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Moon size={14} color="#ef4444" /><Sun size={14} color="#ef4444" /> Nuit + Dimanche cumulé : <strong style={{ color: '#ef4444' }}>+20%</strong></span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Scale size={14} /> Réglages Restaurant — Majorations appliquées :</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Moon size={14} color="#f59e0b" /> Heures de nuit (22h → 7h) : <strong style={{ color: '#f59e0b' }}>+{currentRestaurant?.nightBonusPct || 10}%</strong></span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Sun size={14} color="#10b981" /> Dimanche : <strong style={{ color: '#10b981' }}>+{currentRestaurant?.sundayBonusPct || 10}%</strong></span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Moon size={14} color="#ef4444" /><Sun size={14} color="#ef4444" /> Nuit + Dimanche cumulé : <strong style={{ color: '#ef4444' }}>+{(currentRestaurant?.nightBonusPct || 10) + (currentRestaurant?.sundayBonusPct || 10)}%</strong></span>
             </div>
+
 
             {/* Non-compliant alert panel */}
             {nonCompliantEmployees.length > 0 && (
@@ -324,7 +326,8 @@ const PrepaiePage = () => {
                                                 fontWeight: 600, fontSize: '0.85rem',
                                             }}>
                                                 <Moon size={14} /> {stats.heuresNuit.toFixed(2)} h
-                                                <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>+10%</span>
+                                                <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>+{currentRestaurant?.nightBonusPct || 10}%</span>
+
                                             </span>
                                         ) : (
                                             <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>—</span>
@@ -341,7 +344,8 @@ const PrepaiePage = () => {
                                                 fontWeight: 600, fontSize: '0.85rem',
                                             }}>
                                                 <Sun size={14} /> {stats.heuresDimanche.toFixed(2)} h
-                                                <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>+10%</span>
+                                                <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>+{currentRestaurant?.sundayBonusPct || 10}%</span>
+
                                             </span>
                                         ) : (
                                             <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>—</span>

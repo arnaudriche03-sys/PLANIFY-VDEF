@@ -14,21 +14,26 @@ export const DataProvider = ({ children }) => {
     const [dayNotes, setDayNotes] = useState({});
     const [paidStatus, setPaidStatus] = useState({});
     const [revenueData, setRevenueData] = useState({});
+    const [availabilities, setAvailabilities] = useState({}); // Nouveau: Dispos/Repos
     const [isLoading, setIsLoading] = useState(true);
+
 
     // ─── Chargement initial depuis Supabase ───────────────────────────────────
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const [resResult, empResult, shiResult, noteResult, revResult, reqResult] = await Promise.all([
+            const [resResult, empResult, shiResult, noteResult, revResult, reqResult, availResult] = await Promise.all([
                 supabase.from('restaurants').select('*'),
                 supabase.from('employees').select('*'),
                 supabase.from('shifts').select('*'),
                 supabase.from('day_notes').select('*'),
                 supabase.from('revenue_data').select('*'),
-                supabase.from('shift_requests').select('*')
+                supabase.from('shift_requests').select('*'),
+                supabase.from('employee_availabilities').select('*')
             ]);
+
+
 
             if (resResult.error) throw resResult.error;
             if (empResult.error) throw empResult.error;
@@ -43,8 +48,13 @@ export const DataProvider = ({ children }) => {
                 name: r.name,
                 address: r.address,
                 openingTime: r.opening_time || '09:00',
-                closingTime: r.closing_time || '23:00'
+                closingTime: r.closing_time || '23:00',
+                openingTimeWeekend: r.opening_time_weekend || '09:00',
+                closingTimeWeekend: r.closing_time_weekend || '23:00',
+                nightBonusPct: r.night_bonus_pct !== undefined ? r.night_bonus_pct : 10,
+                sundayBonusPct: r.sunday_bonus_pct !== undefined ? r.sunday_bonus_pct : 10
             })));
+
 
             // Employees par restaurant
             const empByResto = {};
@@ -90,9 +100,12 @@ export const DataProvider = ({ children }) => {
                     shiftId: req.shift_id,
                     requestingEmployeeId: req.requesting_employee_id,
                     targetDate: req.target_date,
+                    startTime: req.start_time, // Nouveau
+                    endTime: req.end_time,     // Nouveau
                     status: req.status, // 'pending', 'approved', 'rejected'
                     createdAt: req.created_at
                 })));
+
             }
 
             // Notes par restaurant
@@ -118,7 +131,41 @@ export const DataProvider = ({ children }) => {
                 setRevenueData(revByResto);
             }
 
+            // Nettoyage de sécurité : identifier et supprimer les doublons de disponibilités
+            const seen = new Set();
+            const duplicates = [];
+            const rawAvails = availResult?.data || [];
+            rawAvails.forEach(a => {
+                const key = `${a.employee_id}-${a.date}-${a.type}-${a.start_time || ''}-${a.end_time || ''}`;
+                if (seen.has(key)) duplicates.push(a.id);
+                else seen.add(key);
+            });
+            if (duplicates.length > 0) {
+                console.log(`Nettoyage de ${duplicates.length} doublons de dispo...`);
+                await Promise.all(duplicates.map(id => supabase.from('employee_availabilities').delete().eq('id', id)));
+            }
+
+            // Availabilities par restaurant (on utilise rawAvails filtré)
+            const filteredAvails = rawAvails.filter(a => !duplicates.includes(a.id));
+            const availByResto = {};
+            filteredAvails.forEach(a => {
+                if (!availByResto[a.restaurant_id]) availByResto[a.restaurant_id] = [];
+                availByResto[a.restaurant_id].push({
+                    id: a.id,
+                    employeeId: a.employee_id,
+                    date: a.date,
+                    type: a.type, // 'repos', 'indispo'
+                    status: a.status || 'pending', // 'pending', 'approved', 'rejected'
+                    startTime: a.start_time?.slice(0, 5) || null,
+                    endTime: a.end_time?.slice(0, 5) || null,
+                    note: a.note || ''
+                });
+            });
+            setAvailabilities(availByResto);
+
+
         } catch (error) {
+
             console.error('Erreur fetchData Supabase:', error);
         } finally {
             setIsLoading(false);
@@ -127,7 +174,31 @@ export const DataProvider = ({ children }) => {
 
     useEffect(() => {
         fetchData();
+
+        // ─── Abonnements Supabase Realtime ─────────────────────────────────
+        // Dès qu'un salarié ou manager modifie des données, tout le monde est mis à jour automatiquement.
+        const channel = supabase
+            .channel('planify-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
+                console.log('[Realtime] Changement détecté sur shifts → Rechargement...');
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_availabilities' }, () => {
+                console.log('[Realtime] Changement détecté sur employee_availabilities → Rechargement...');
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_requests' }, () => {
+                console.log('[Realtime] Changement détecté sur shift_requests → Rechargement...');
+                fetchData();
+            })
+            .subscribe();
+
+        // Nettoyage à la destruction du composant
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [fetchData]);
+
 
     useEffect(() => {
         if (currentRestaurantId) {
@@ -177,6 +248,8 @@ export const DataProvider = ({ children }) => {
     const currentShifts = shifts[currentRestaurantId] || [];
     const currentDayNotes = dayNotes[currentRestaurantId] || {};
     const currentRevenueData = revenueData[currentRestaurantId] || {};
+    const currentAvailabilities = availabilities[currentRestaurantId] || [];
+
 
     // ─── Actions Restaurants ──────────────────────────────────────────────────
 
@@ -350,11 +423,19 @@ export const DataProvider = ({ children }) => {
 
     const offerShift = async (shiftId) => {
         try {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const shift = (shifts[currentRestaurantId] || []).find(s => s.id === shiftId);
+            
+            if (shift && shift.date < todayStr) {
+                throw new Error("Impossible de proposer un shift passé.");
+            }
+
             // Mettre à jour en base de données
             const { error } = await supabase
                 .from('shifts')
                 .update({ status: 'offered' })
                 .eq('id', shiftId);
+
 
             if (error) throw error;
 
@@ -372,8 +453,13 @@ export const DataProvider = ({ children }) => {
         }
     };
 
-    const takeShift = async (shiftId, requestingEmployeeId, targetDate) => {
+    const takeShift = async (shiftId, requestingEmployeeId, targetDate, startTime = null, endTime = null) => {
         try {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (targetDate < todayStr) {
+                throw new Error("Impossible de demander un shift passé.");
+            }
+
             // Créer la demande en BDD
             const { data, error } = await supabase
                 .from('shift_requests')
@@ -381,6 +467,8 @@ export const DataProvider = ({ children }) => {
                     shift_id: shiftId,
                     requesting_employee_id: requestingEmployeeId,
                     target_date: targetDate,
+                    start_time: startTime,
+                    end_time: endTime,
                     status: 'pending'
                 }])
                 .select();
@@ -406,6 +494,14 @@ export const DataProvider = ({ children }) => {
 
     const approveShiftRequest = async (requestId, shiftId, newEmployeeId) => {
         try {
+            // 0. Récupérer le shift et la demande
+            const req = shiftRequests.find(r => r.id === requestId);
+            const originalShift = (shifts[currentRestaurantId] || []).find(s => s.id === shiftId);
+
+            if (!req || !originalShift) throw new Error("Requête ou shift introuvable");
+
+            const isPartial = req.startTime && req.endTime && (req.startTime !== originalShift.startTime || req.endTime !== originalShift.endTime);
+
             // 1. Marquer la demande comme approuvée
             const { error: errorApprove } = await supabase
                 .from('shift_requests')
@@ -421,34 +517,61 @@ export const DataProvider = ({ children }) => {
                 .neq('id', requestId)
                 .eq('status', 'pending');
 
-            // 3. Mettre à jour le shift lui-même (nouvel employé + status 'assigned')
-            const { error: errorShift } = await supabase
-                .from('shifts')
-                .update({
-                    employee_id: newEmployeeId,
-                    status: 'assigned'
-                })
-                .eq('id', shiftId);
-            if (errorShift) throw errorShift;
-
-            // 4. Mettre à jour l'état local des demandes
-            setShiftRequests(prev => prev.map(req => {
-                if (req.id === requestId) return { ...req, status: 'approved' };
-                if (req.shiftId === shiftId && req.status === 'pending') return { ...req, status: 'rejected' };
-                return req;
-            }));
-
-            // 5. Mettre à jour l'état local des shifts
-            setShifts(prev => {
-                const updated = { ...prev };
-                if (updated[currentRestaurantId]) {
-                    updated[currentRestaurantId] = updated[currentRestaurantId].map(s =>
-                        s.id === shiftId ? { ...s, employeeId: newEmployeeId, status: 'assigned' } : s
-                    );
+            // 3. Gérer le splitting si c'est une aide partielle
+            if (isPartial) {
+                // Créer les shifts vacants pour les restes
+                const adds = [];
+                if (req.startTime > originalShift.startTime) {
+                    adds.push({
+                        restaurant_id: currentRestaurantId,
+                        date: originalShift.date,
+                        start_time: originalShift.startTime,
+                        end_time: req.startTime,
+                        status: 'offered',
+                        employee_id: null
+                    });
                 }
-                return updated;
-            });
+                if (req.endTime < originalShift.endTime) {
+                    adds.push({
+                        restaurant_id: currentRestaurantId,
+                        date: originalShift.date,
+                        start_time: req.endTime,
+                        end_time: originalShift.endTime,
+                        status: 'offered',
+                        employee_id: null
+                    });
+                }
 
+                if (adds.length > 0) {
+                    const { error: errAdd } = await supabase.from('shifts').insert(adds);
+                    if (errAdd) throw errAdd;
+                }
+
+                // Mettre à jour le shift original pour devenir l'aide de l'employé
+                const { error: errUpd } = await supabase
+                    .from('shifts')
+                    .update({
+                        employee_id: newEmployeeId,
+                        start_time: req.startTime,
+                        end_time: req.endTime,
+                        status: 'assigned'
+                    })
+                    .eq('id', shiftId);
+                if (errUpd) throw errUpd;
+            } else {
+                // Cas standard (pas partiel)
+                const { error: errorShift } = await supabase
+                    .from('shifts')
+                    .update({
+                        employee_id: newEmployeeId,
+                        status: 'assigned'
+                    })
+                    .eq('id', shiftId);
+                if (errorShift) throw errorShift;
+            }
+
+            // 4. Mettre à jour l'état local via refresh global (plus simple pour les splits complexes)
+            await refreshData();
         } catch (error) {
             console.error('Erreur approveShiftRequest Supabase:', error);
             throw error;
@@ -456,6 +579,7 @@ export const DataProvider = ({ children }) => {
     };
 
     const rejectShiftRequest = async (requestId) => {
+
         try {
             const { error } = await supabase
                 .from('shift_requests')
@@ -477,7 +601,124 @@ export const DataProvider = ({ children }) => {
         return takeShift(shiftId, requestingEmployeeId, date);
     };
 
+    // ─── Disponibilités / Repos ──────────────────────────────────────────────
+
+    const updateAvailability = async (payload) => {
+        try {
+            // Nettoyage proactif des doublons pour les Repos
+            if (payload.type === 'repos') {
+                let query = supabase
+                    .from('employee_availabilities')
+                    .delete()
+                    .eq('employee_id', payload.employeeId)
+                    .eq('date', payload.date);
+                // N'exclure un ID que si on en a un valide (update, pas insert)
+                if (payload.id) query = query.neq('id', payload.id);
+                const { error: delError } = await query;
+                if (delError) throw delError;
+            }
+
+
+            const isNew = !payload.id;
+            const dbPayload = {
+                restaurant_id: currentRestaurantId,
+                employee_id: payload.employeeId,
+                date: payload.date,
+                type: payload.type,
+                start_time: payload.startTime || null,
+                end_time: payload.endTime || null,
+                note: payload.note || null
+            };
+
+            let finalId = payload.id;
+
+            if (isNew) {
+                const { data, error } = await supabase.from('employee_availabilities').insert([dbPayload]).select();
+                if (error) throw error;
+                if (data?.[0]) finalId = data[0].id;
+            } else {
+                const { error } = await supabase.from('employee_availabilities').update(dbPayload).eq('id', payload.id);
+                if (error) throw error;
+            }
+
+            // Sync local state with cleaning
+            setAvailabilities(prev => {
+                const current = prev[currentRestaurantId] || [];
+                let cleaned = current;
+                if (payload.type === 'repos') {
+                    cleaned = current.filter(a => !(a.employeeId == payload.employeeId && a.date === payload.date && a.id !== payload.id));
+                }
+                
+                let updated;
+                if (isNew) {
+                    updated = [...cleaned, { ...payload, id: finalId }];
+                } else {
+                    updated = cleaned.map(a => a.id === payload.id ? { ...payload, id: finalId } : a);
+                }
+                return { ...prev, [currentRestaurantId]: updated };
+            });
+
+            return finalId;
+        } catch (error) {
+            console.error('Erreur updateAvailability Supabase:', error);
+            throw error;
+        }
+    };
+
+
+
+    const deleteAvailability = async (id) => {
+        try {
+            const { error } = await supabase.from('employee_availabilities').delete().eq('id', id);
+            if (error) throw error;
+
+            setAvailabilities(prev => {
+                const current = prev[currentRestaurantId] || [];
+                const updated = current.filter(a => a.id !== id);
+                return { ...prev, [currentRestaurantId]: updated };
+            });
+        } catch (error) {
+            console.error('Erreur deleteAvailability Supabase:', error);
+            throw error;
+        }
+    };
+
+    const approveAvailability = async (id) => {
+        try {
+            const { error } = await supabase
+                .from('employee_availabilities')
+                .update({ status: 'approved' })
+                .eq('id', id);
+            if (error) throw error;
+            setAvailabilities(prev => {
+                const current = prev[currentRestaurantId] || [];
+                return { ...prev, [currentRestaurantId]: current.map(a => a.id === id ? { ...a, status: 'approved' } : a) };
+            });
+        } catch (error) {
+            console.error('Erreur approveAvailability:', error);
+            throw error;
+        }
+    };
+
+    const rejectAvailability = async (id) => {
+        try {
+            const { error } = await supabase
+                .from('employee_availabilities')
+                .update({ status: 'rejected' })
+                .eq('id', id);
+            if (error) throw error;
+            setAvailabilities(prev => {
+                const current = prev[currentRestaurantId] || [];
+                return { ...prev, [currentRestaurantId]: current.map(a => a.id === id ? { ...a, status: 'rejected' } : a) };
+            });
+        } catch (error) {
+            console.error('Erreur rejectAvailability:', error);
+            throw error;
+        }
+    };
+
     // ─── Utilitaires ──────────────────────────────────────────────────────────
+
 
     const getEmployeeColor = (employeeId) => {
         const colorIndex = ((employeeId - 1) % 10) + 1;
@@ -540,7 +781,17 @@ export const DataProvider = ({ children }) => {
         approveShiftRequest,
         rejectShiftRequest,
         claimVacantShift,
+
+        // Disponibilités
+        availabilities,
+        currentAvailabilities,
+        updateAvailability,
+        deleteAvailability,
+        approveAvailability,
+        rejectAvailability,
+
     };
+
 
     return (
         <DataContext.Provider value={value}>

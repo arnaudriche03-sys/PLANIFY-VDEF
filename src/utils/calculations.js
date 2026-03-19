@@ -25,10 +25,14 @@ export const calculateWeeklyHours = (shifts, employeeId) => {
  * @param {number} tauxHoraireBreut - taux horaire brut de l'employé (€/h)
  * @returns {{ heuresJour, heuresNuit, heuresDimanche, coutBrut }}
  */
-export const splitShiftHours = (shift, tauxHoraireBreut = 0) => {
+export const splitShiftHours = (shift, tauxHoraireBreut = 0, restaurantSettings = null) => {
     if (!shift.startTime || !shift.endTime) {
         return { heuresJour: 0, heuresNuit: 0, heuresDimanche: 0, heuresTotal: 0, coutBrut: 0 };
     }
+
+    // Récupérer les taux de majoration du restaurant (défaut 10% si non défini)
+    const nightBonus = (restaurantSettings?.nightBonusPct ?? 10) / 100;
+    const sundayBonus = (restaurantSettings?.sundayBonusPct ?? 10) / 100;
 
     const [sh, sm] = shift.startTime.split(':').map(Number);
     const [eh, em] = shift.endTime.split(':').map(Number);
@@ -37,27 +41,21 @@ export const splitShiftHours = (shift, tauxHoraireBreut = 0) => {
     let endMin = eh * 60 + em;
 
     if (endMin <= startMin) {
-        // Shift traversant minuit : endMin représente les minutes après minuit
-        // On étend à 1440 (24h) + endMin pour boucler correctement
         endMin += 1440;
     }
 
-    // Détection dimanche en timezone LOCALE (new Date('YYYY-MM-DD') est UTC → bias UTC+1)
     let isDimanche = false;
     if (shift.date) {
         const [y, mo, da] = shift.date.split('-').map(Number);
         isDimanche = new Date(y, mo - 1, da).getDay() === 0;
     }
 
-    // Plages nuit en minutes depuis minuit : 0→420 (0h→7h) et 1320→1440 (22h→24h)
-    const NUIT_MATIN_FIN = 7 * 60;   // 420
-    const NUIT_SOIR_DEBUT = 22 * 60; // 1320
+    const NUIT_MATIN_FIN = 7 * 60;
+    const NUIT_SOIR_DEBUT = 22 * 60;
 
     let minutesJour = 0;
     let minutesNuit = 0;
 
-    // Parcours minute par minute. Pour les shifts traversant minuit, m peut dépasser 1440.
-    // On normalise avec % 1440 pour que 1h30 du matin (= 90min) reste classée "nuit".
     for (let m = startMin; m < endMin; m++) {
         const mNorm = m % 1440;
         const isNuit = mNorm < NUIT_MATIN_FIN || mNorm >= NUIT_SOIR_DEBUT;
@@ -68,21 +66,18 @@ export const splitShiftHours = (shift, tauxHoraireBreut = 0) => {
     const heuresJour = minutesJour / 60;
     const heuresNuit = minutesNuit / 60;
     const heuresTotal = heuresJour + heuresNuit;
-
-    // Heures dimanche = toutes les heures du shift si c'est un dimanche
     const heuresDimanche = isDimanche ? heuresTotal : 0;
 
-    // Calcul du coût brut avec majorations
     let coutBrut = 0;
     if (tauxHoraireBreut > 0) {
-        // Coût des heures selon leur nature (nuit et/ou dimanche se cumulent)
         if (isDimanche) {
-            // Dimanche : toutes les heures à +10%
-            const tauxDimanche = tauxHoraireBreut * 1.10;
-            const tauxNuitDimanche = tauxHoraireBreut * 1.20; // nuit + dimanche
+            // Dimanche : toutes les heures à +sundayBonus
+            // Si c'est aussi la nuit : tauxHoraireBreut * (1 + sundayBonus + nightBonus)
+            const tauxDimanche = tauxHoraireBreut * (1 + sundayBonus);
+            const tauxNuitDimanche = tauxHoraireBreut * (1 + sundayBonus + nightBonus);
             coutBrut = heuresJour * tauxDimanche + heuresNuit * tauxNuitDimanche;
         } else {
-            coutBrut = heuresJour * tauxHoraireBreut + heuresNuit * tauxHoraireBreut * 1.10;
+            coutBrut = heuresJour * tauxHoraireBreut + heuresNuit * tauxHoraireBreut * (1 + nightBonus);
         }
     }
 
@@ -94,6 +89,7 @@ export const splitShiftHours = (shift, tauxHoraireBreut = 0) => {
         coutBrut: Math.round(coutBrut * 100) / 100,
     };
 };
+
 
 // Check if two time ranges overlap
 const timesOverlap = (start1, end1, start2, end2) => {
@@ -135,7 +131,7 @@ export const wouldExceedMaxHours = (shifts, employee, newShift) => {
  * @param {number} capaciteMax  - Capacité max en couverts (0 = désactivé)
  * @returns {Object} métriques calculées
  */
-export const calculatePerformanceMetrics = (shifts, employees, revenueEntry, capaciteMax = 0) => {
+export const calculatePerformanceMetrics = (shifts, employees, revenueEntry, capaciteMax = 0, restaurantSettings = null) => {
     const empMap = {};
     employees.forEach(e => { empMap[e.id] = e; });
 
@@ -145,10 +141,11 @@ export const calculatePerformanceMetrics = (shifts, employees, revenueEntry, cap
     shifts.forEach(s => {
         const emp = empMap[s.employeeId];
         const taux = emp?.hourlyRate || 0;
-        const split = splitShiftHours(s, taux);
+        const split = splitShiftHours(s, taux, restaurantSettings);
         totalHeures += split.heuresTotal;
         coutChargeTotal += split.coutBrut * 1.42;
     });
+
 
     totalHeures = Math.round(totalHeures * 100) / 100;
     coutChargeTotal = Math.round(coutChargeTotal);
@@ -187,7 +184,24 @@ export const calculatePerformanceMetrics = (shifts, employees, revenueEntry, cap
  * @param {Array} dayShifts - Liste des shifts (réels) pour une journée
  * @returns {Array} Liste des créneaux vacants [{ startTime, endTime }]
  */
-export const getVacantTimeSlots = (openingTime, closingTime, dayShifts) => {
+/**
+ * Identifie les créneaux horaires où personne n'est planifié durant les heures d'ouverture.
+ * @param {Array} dayShifts - Liste des shifts (réels) pour une journée
+ * @param {string} date - "YYYY-MM-DD"
+ * @param {Object} restaurantSettings - Objet restaurant complet
+ * @returns {Array} Liste des créneaux vacants [{ startTime, endTime }]
+ */
+export const getVacantTimeSlots = (dayShifts, date, restaurantSettings) => {
+    if (!restaurantSettings || !date) return [];
+
+    // Déterminer si weekend
+    const [y, mo, da] = date.split('-').map(Number);
+    const dayOfWeek = new Date(y, mo - 1, da).getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // 0=Dimanche, 6=Samedi
+
+    const openingTime = isWeekend ? restaurantSettings.openingTimeWeekend : restaurantSettings.openingTime;
+    const closingTime = isWeekend ? restaurantSettings.closingTimeWeekend : restaurantSettings.closingTime;
+
     if (!openingTime || !closingTime) return [];
 
     const [oh, om] = openingTime.split(':').map(Number);
@@ -251,3 +265,4 @@ export const getVacantTimeSlots = (openingTime, closingTime, dayShifts) => {
 
     return vacantSlots;
 };
+
