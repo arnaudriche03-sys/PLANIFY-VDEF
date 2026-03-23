@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 
 const DataContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = () => useContext(DataContext);
 
 export const DataProvider = ({ children }) => {
@@ -571,7 +572,7 @@ export const DataProvider = ({ children }) => {
             }
 
             // 4. Mettre à jour l'état local via refresh global (plus simple pour les splits complexes)
-            await refreshData();
+            await fetchData();
         } catch (error) {
             console.error('Erreur approveShiftRequest Supabase:', error);
             throw error;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { X, Trash2 } from 'lucide-react';
 
@@ -12,37 +12,32 @@ const RestaurantModal = ({ onClose, mode }) => {
     } = useData();
 
     const isEdit = mode === 'edit';
-    const [formData, setFormData] = useState({ 
-        name: '', 
-        address: '', 
-        openingTime: '09:00', 
-        closingTime: '23:00',
-        openingTimeWeekend: '09:00',
-        closingTimeWeekend: '23:00',
-        nightBonusPct: 10,
-        sundayBonusPct: 10
-    });
-
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-    useEffect(() => {
-        if (mode === 'create') {
-            setFormData({ name: '', address: '' });
-        } else if (currentRestaurant) {
-            setFormData({
-                name: currentRestaurant.name,
-                address: currentRestaurant.address,
+    const [formData, setFormData] = useState(() => {
+        if (mode === 'edit' && currentRestaurant) {
+            return {
+                name: currentRestaurant.name || '',
+                address: currentRestaurant.address || '',
                 openingTime: currentRestaurant.openingTime || '09:00',
                 closingTime: currentRestaurant.closingTime || '23:00',
                 openingTimeWeekend: currentRestaurant.openingTimeWeekend || '09:00',
                 closingTimeWeekend: currentRestaurant.closingTimeWeekend || '23:00',
                 nightBonusPct: currentRestaurant.nightBonusPct !== undefined ? currentRestaurant.nightBonusPct : 10,
                 sundayBonusPct: currentRestaurant.sundayBonusPct !== undefined ? currentRestaurant.sundayBonusPct : 10
-            });
-
+            };
         }
-        setShowDeleteConfirm(false);
-    }, [mode, currentRestaurant]);
+        return { 
+            name: '', 
+            address: '', 
+            openingTime: '09:00', 
+            closingTime: '23:00',
+            openingTimeWeekend: '09:00',
+            closingTimeWeekend: '23:00',
+            nightBonusPct: 10,
+            sundayBonusPct: 10
+        };
+    });
+
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const handleSubmit = (e) => {
         e.preventDefault();

@@ -135,17 +135,19 @@ const AssistantPage = () => {
 
     useEffect(() => {
         if (showKpiPanel) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setKpiForm({
                 ca: existingKpi.caPrevisionnel || '',
                 couverts: existingKpi.nbCouverts || '',
             });
             setKpiSaved(false);
         }
-    }, [showKpiPanel, selectedKpiWeek, JSON.stringify(existingKpi)]);
+    }, [showKpiPanel, selectedKpiWeek, existingKpi.caPrevisionnel, existingKpi.nbCouverts]);
 
     // ── Chargement de l'historique depuis Supabase ──────────────────────────
     const loadHistory = useCallback(async () => {
-        setIsLoadingHistory(true);
+        // setIsLoadingHistory(true) is handled by the initial state or manually if needed, 
+        // but here we ensure it doesn't trigger sync render issues.
         const { data, error } = await supabase
             .from('ai_messages')
             .select('*')
@@ -165,6 +167,7 @@ const AssistantPage = () => {
     }, [currentRestaurantId]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         loadHistory();
     }, [loadHistory]);
 

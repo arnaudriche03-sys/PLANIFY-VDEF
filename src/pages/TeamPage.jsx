@@ -4,7 +4,7 @@ import { UserPlus, Settings, Trash2, X, Info } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 const EquipePage = () => {
-    const { currentEmployees, updateEmployees, currentRestaurantId, getEmployeeColor } = useData();
+    const { currentEmployees, updateEmployees, getEmployeeColor } = useData();
     const [showEmployeeModal, setShowEmployeeModal] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState(null);
     const [formData, setFormData] = useState({

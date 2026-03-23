@@ -139,8 +139,6 @@ const AuditMarkdown = ({ content }) => {
 // ── Composant principal ──────────────────────────────────────────────────────
 
 const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysisText, weekStart, isLoading }) => {
-    if (!isOpen) return null;
-
     // Helper local pour normaliser au lundi
     const getMonday = (date) => {
         let d;
@@ -161,6 +159,8 @@ const AuditModal = ({ isOpen, onClose, onRefresh, metrics, prevMetrics, analysis
         return getMonday(initial);
     });
     const [viewType, setViewType] = React.useState('week'); // 'week' | 'month'
+
+    if (!isOpen) return null;
 
     // Formater la période affichée
     const formatDateRange = () => {

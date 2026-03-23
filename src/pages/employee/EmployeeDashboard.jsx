@@ -1,14 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { Calendar as CalendarIcon, Clock, User, LogOut, ChevronLeft, ChevronRight, AlertCircle, CheckCircle, ArrowRightLeft, X, Users } from 'lucide-react';
-import { format, startOfWeek, addDays, isSameDay, isToday } from 'date-fns';
+import { format, startOfWeek, addDays, isToday } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { getVacantTimeSlots } from '../../utils/calculations';
 
 const EmployeeDashboard = () => {
     const {
         currentRestaurant, employees, currentRestaurantId, currentShifts,
-        currentEmployeeId, logout, offerShift, takeShift, claimVacantShift,
+        currentEmployeeId, logout, offerShift, takeShift,
         shiftRequests, currentAvailabilities, updateAvailability, deleteAvailability, refreshData
     } = useData();
 
@@ -416,7 +415,7 @@ const EmployeeDashboard = () => {
                                                             setActionLoading(true);
                                                             takeShift(shift.id, currentEmployeeId, shift.date)
                                                                 .then(() => alert("Demande envoyée !"))
-                                                                .catch(e => alert("Erreur lors de la prise du shift"))
+                                                                .catch(() => alert("Erreur lors de la prise du shift"))
                                                                 .finally(() => setActionLoading(false));
                                                         }
                                                     }
@@ -548,7 +547,7 @@ const EmployeeDashboard = () => {
                                 } else {
                                     await updateAvailability({ employeeId: currentEmployeeId, date: dateStr, type: 'repos' });
                                 }
-                            } catch (err) {
+                            } catch {
                                 alert("Erreur lors de la mise à jour des disponibilités.");
                             }
                         };
@@ -564,7 +563,7 @@ const EmployeeDashboard = () => {
                                 } else {
                                     await updateAvailability({ employeeId: currentEmployeeId, date: dateStr, type: 'indispo', startTime: '08:00', endTime: '12:00' });
                                 }
-                            } catch (err) {
+                            } catch {
                                 alert("Erreur lors de la mise à jour des disponibilités.");
                             }
                         };
@@ -932,7 +931,7 @@ const EmployeeDashboard = () => {
                                             setPartialShiftSelection(null);
                                             await refreshData();
 
-                                        } catch (e) {
+                                        } catch {
                                             alert("Erreur lors de l'envoi de la demande.");
                                         } finally {
                                             setActionLoading(false);

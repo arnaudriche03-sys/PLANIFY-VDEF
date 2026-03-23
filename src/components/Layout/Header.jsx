@@ -3,7 +3,7 @@ import { useData } from '../../context/DataContext';
 import { Settings, Plus, LogOut, LayoutDashboard, Users, Calendar, Calculator, LineChart } from 'lucide-react';
 
 const Header = ({ currentTab, setCurrentTab, onOpenRestaurantModal }) => {
-    const { currentRestaurantId, setCurrentRestaurantId, restaurants, currentRestaurant, logout } = useData();
+    const { currentRestaurantId, setCurrentRestaurantId, restaurants, logout } = useData();
 
     return (
         <header className="header">

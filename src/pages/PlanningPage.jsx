@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Icons } from '../components/UI/Icons';
 import { ChevronDown, ChevronRight, AlertTriangle, Moon, Clock, Calendar as CalendarIcon, Users, Calculator, Trash, X, ArrowRightLeft } from 'lucide-react';
 
@@ -9,13 +9,13 @@ import { fr } from 'date-fns/locale';
 
 const PlanningPage = () => {
     const { 
-        currentRestaurant, currentShifts, currentDayNotes, updateShifts, updateDayNotes, 
-        updateEmployees, currentEmployees, getEmployeeColor, shiftRequests, approveShiftRequest, 
-        rejectShiftRequest, currentAvailabilities, refreshData, approveAvailability, rejectAvailability
+        currentRestaurant, currentShifts, updateShifts, 
+        currentEmployees, getEmployeeColor, shiftRequests, approveShiftRequest, 
+        rejectShiftRequest, currentAvailabilities, approveAvailability, rejectAvailability
     } = useData();
 
     
-    const [actionLoading, setActionLoading] = useState(false);
+    // UI State
 
 
     const [planningView, setPlanningView] = useState('week'); // 'week' or 'month'
@@ -30,7 +30,6 @@ const PlanningPage = () => {
         endTime: '17:00',
         note: ''
     });
-    const [validationWarnings, setValidationWarnings] = useState([]);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // ── Helper : formate une date en YYYY-MM-DD en heure LOCALE (évite le décalage UTC+1) ──
@@ -128,7 +127,9 @@ const PlanningPage = () => {
     const weekDatesArray = getWeekDates(currentDate);
     const weekStart = weekDatesArray[0].dateString;
     const weekEnd = weekDatesArray[6].dateString;
-    const currentWeekShifts = currentShifts.filter(s => s.date >= weekStart && s.date <= weekEnd);
+    const currentWeekShifts = useMemo(() => 
+        currentShifts.filter(s => s.date >= weekStart && s.date <= weekEnd),
+    [currentShifts, weekStart, weekEnd]);
 
     // Identify overtime employees
     const overtimeEmployees = currentEmployees.map(emp => {
@@ -146,7 +147,6 @@ const PlanningPage = () => {
             endTime: '17:00',
             note: ''
         });
-        setValidationWarnings([]);
         setShowDeleteConfirm(false);
         setShowShiftModal(true);
     };
@@ -161,7 +161,6 @@ const PlanningPage = () => {
             endTime: shift.endTime,
             note: shift.note || ''
         });
-        setValidationWarnings([]);
         setShowDeleteConfirm(false);
         setShowShiftModal(true);
     };
@@ -175,8 +174,8 @@ const PlanningPage = () => {
     };
 
     // Validation temps réel pour les alertes de disponibilité
-    useEffect(() => {
-        if (!showShiftModal) return;
+    const validationWarnings = useMemo(() => {
+        if (!showShiftModal) return [];
         
         const warnings = [];
         const isVacant = shiftFormData.employeeId === 'vacant' || !shiftFormData.employeeId;
@@ -235,8 +234,7 @@ const PlanningPage = () => {
         }
         
         // Déduplication des messages pour éviter les alertes redondantes
-        const uniqueWarnings = Array.from(new Set(warnings));
-        setValidationWarnings(uniqueWarnings);
+        return Array.from(new Set(warnings));
     }, [shiftFormData, showShiftModal, currentAvailabilities, currentEmployees, currentWeekShifts, editingShift]);
 
 
@@ -318,7 +316,6 @@ const PlanningPage = () => {
         }
 
         setShowShiftModal(false);
-        setValidationWarnings([]);
         setEditingShift(null);
     };
 

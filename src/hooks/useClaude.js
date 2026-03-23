@@ -56,13 +56,6 @@ export const useClaude = () => {
             const heuresDimParEmploye = {};    // dimanche
             const coutBrutParEmploye = {};     // brut avec majorations
 
-            const shiftDuration = (s) => {
-                if (!s.startTime || !s.endTime) return 0;
-                const [sh, sm] = s.startTime.split(':').map(Number);
-                const [eh, em] = s.endTime.split(':').map(Number);
-                const d = (eh * 60 + em - (sh * 60 + sm)) / 60;
-                return d > 0 ? d : 0;
-            };
 
             currentShifts.forEach(s => {
                 const emp = currentEmployees.find(e => e.id === s.employeeId);
