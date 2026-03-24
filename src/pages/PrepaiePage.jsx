@@ -210,7 +210,7 @@ const PrepaiePage = () => {
                             <Icons.ChevronRight size={18} />
                         </button>
                     </div>
-                    <button className="btn-export" onClick={handleExportCSV}>
+                    <button className="btn-export desktop-only" onClick={handleExportCSV}>
                         <Download size={18} /> Exporter CSV
                     </button>
                 </div>

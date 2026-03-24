@@ -281,15 +281,16 @@ const AssistantPage = () => {
                     <div className="assistant-header">
                         <div className="assistant-title">
                             <LineChart className="icon-sparkle" size={20} />
-                            <span>Analyse IA</span>
+                            <span>Analyse IA (Mise à Jour OK)</span>
                             <span className="badge-beta">PRO</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="assistant-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {/* Bouton Audit Stratégique */}
                             <button
                                 onClick={handleAudit}
                                 disabled={isAILoading}
                                 title="Lancer l'audit stratégique des KPI"
+                                className="desktop-only"
                                 style={{
                                     background: 'linear-gradient(135deg, #6366f1, #818cf8)',
                                     color: 'white',
@@ -317,7 +318,7 @@ const AssistantPage = () => {
                             >
                                 <BarChart3 size={14} /> KPI Hebdo
                             </button>
-                            <div className="assistant-subtitle">Expert HCR &amp; Code du Travail</div>
+                            <div className="assistant-subtitle desktop-only">Expert HCR &amp; Code du Travail</div>
                             {chatMessages.length > 0 && (
                                 <button
                                     onClick={clearHistory}

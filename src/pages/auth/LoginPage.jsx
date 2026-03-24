@@ -3,7 +3,7 @@ import { useData } from '../../context/DataContext';
 import { ChefHat, Users, Lock, ChevronRight, ArrowLeft } from 'lucide-react';
 import '../../index.css';
 
-const LoginPage = () => {
+const LoginPage = ({ onBack }) => {
     const { restaurants, currentRestaurantId, setCurrentRestaurantId, currentEmployees, loginAsManager, loginAsEmployee } = useData();
     const [view, setView] = useState('selection'); // 'selection' | 'manager' | 'employee' | 'employee-pin'
     const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -36,6 +36,14 @@ const LoginPage = () => {
 
     const renderSelection = () => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
+            {onBack && (
+                <button onClick={onBack} style={{
+                    background: 'none', border: 'none', color: '#94a3b8', display: 'flex', alignItems: 'center',
+                    gap: '8px', cursor: 'pointer', padding: 0, marginBottom: '8px', fontSize: '0.9rem'
+                }}>
+                    <ArrowLeft size={16} /> Retour au site
+                </button>
+            )}
             <h2 style={{ fontSize: '1.5rem', color: '#f1f5f9', fontWeight: '700', marginBottom: '8px', textAlign: 'center' }}>
                 Bienvenue sur Planify
             </h2>
