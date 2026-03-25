@@ -465,7 +465,12 @@ const PlanningPage = () => {
                                                             {avail.type === 'repos' ? <Moon size={14} /> : <X size={14} />}
                                                         </div>
                                                         <div className="request-details">
-                                                            <span className="request-label">{avail.type === 'repos' ? 'Repos' : 'Indisponible'}</span>
+                                                            <span className="request-label">
+                                                                {avail.type === 'repos' ? 'Repos' : 'Indisponible'}
+                                                                {avail.startTime && avail.endTime && (
+                                                                    <span className="request-hours"> ({avail.startTime} - {avail.endTime})</span>
+                                                                )}
+                                                            </span>
                                                             <span className="request-date">{avail.date}</span>
                                                         </div>
                                                     </div>

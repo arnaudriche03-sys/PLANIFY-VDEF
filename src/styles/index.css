@@ -1662,6 +1662,12 @@
             color: var(--text-primary);
         }
 
+        .request-hours {
+            font-weight: 400;
+            opacity: 0.7;
+            font-size: 0.8rem;
+        }
+
         .request-date {
             font-size: 0.75rem;
             color: var(--text-secondary);
