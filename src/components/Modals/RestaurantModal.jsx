@@ -142,7 +142,7 @@ const RestaurantModal = ({ onClose, mode }) => {
 
     return (
         <div className="modal-overlay">
-            <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <div className="modal-content">
                 <div className="modal-header">
                     <h2>{isEdit ? 'Modifier le Restaurant' : 'Ajouter un Restaurant'}</h2>
                     <button className="close-btn" onClick={onClose}><X size={20} /></button>
@@ -336,7 +336,7 @@ const RestaurantModal = ({ onClose, mode }) => {
 
                 </div>
 
-                <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+                <div className="modal-footer">
                     {isEdit ? (
                         !showDeleteConfirm ? (
                             <button

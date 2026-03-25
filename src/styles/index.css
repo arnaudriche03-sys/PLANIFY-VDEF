@@ -2265,14 +2265,17 @@
 
         .modal-content {
             background: var(--bg-card);
-            padding: 24px;
             border-radius: 16px;
             box-shadow: var(--shadow-lg);
-            width: 90%;
+            width: 95%;
             max-width: 500px;
+            max-height: 90vh; /* Limite la hauteur à 90% de l'écran */
             border: 1px solid var(--border);
             animation: slideIn 0.3s ease-out;
             color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         @keyframes slideIn {
@@ -2291,7 +2294,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            padding: 24px 24px 16px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .modal-header h2 {
@@ -2319,7 +2323,19 @@
         }
 
         .modal-body {
-            margin-bottom: 24px;
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            justify-content: space-between; /* Permet d'avoir Delete à gauche et Save à droite */
+            align-items: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(0, 0, 0, 0.1);
         }
 
         .form-group {
