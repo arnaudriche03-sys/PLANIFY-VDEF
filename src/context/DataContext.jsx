@@ -21,8 +21,8 @@ export const DataProvider = ({ children }) => {
 
     // ─── Chargement initial depuis Supabase ───────────────────────────────────
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
+    const fetchData = useCallback(async (silent = false) => {
+        if (!silent) setIsLoading(true);
         try {
             const [resResult, empResult, shiResult, noteResult, revResult, reqResult, availResult] = await Promise.all([
                 supabase.from('restaurants').select('*'),
@@ -138,24 +138,10 @@ export const DataProvider = ({ children }) => {
                 setRevenueData(revByResto);
             }
 
-            // Nettoyage de sécurité : identifier et supprimer les doublons de disponibilités
-            const seen = new Set();
-            const duplicates = [];
+            // Availabilities par restaurant
             const rawAvails = availResult?.data || [];
-            rawAvails.forEach(a => {
-                const key = `${a.employee_id}-${a.date}-${a.type}-${a.start_time || ''}-${a.end_time || ''}`;
-                if (seen.has(key)) duplicates.push(a.id);
-                else seen.add(key);
-            });
-            if (duplicates.length > 0) {
-                console.log(`Nettoyage de ${duplicates.length} doublons de dispo...`);
-                await Promise.all(duplicates.map(id => supabase.from('employee_availabilities').delete().eq('id', id)));
-            }
-
-            // Availabilities par restaurant (on utilise rawAvails filtré)
-            const filteredAvails = rawAvails.filter(a => !duplicates.includes(a.id));
             const availByResto = {};
-            filteredAvails.forEach(a => {
+            rawAvails.forEach(a => {
                 if (!availByResto[a.restaurant_id]) availByResto[a.restaurant_id] = [];
                 availByResto[a.restaurant_id].push({
                     id: a.id,
@@ -187,16 +173,13 @@ export const DataProvider = ({ children }) => {
         const channel = supabase
             .channel('planify-realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
-                console.log('[Realtime] Changement détecté sur shifts → Rechargement...');
-                fetchData();
+                fetchData(true);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_availabilities' }, () => {
-                console.log('[Realtime] Changement détecté sur employee_availabilities → Rechargement...');
-                fetchData();
+                fetchData(true);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_requests' }, () => {
-                console.log('[Realtime] Changement détecté sur shift_requests → Rechargement...');
-                fetchData();
+                fetchData(true);
             })
             .subscribe();
 
@@ -332,50 +315,54 @@ export const DataProvider = ({ children }) => {
 
     const updateShifts = async (newShifts) => {
         const oldShifts = shifts[currentRestaurantId] || [];
+        const oldIds = new Set(oldShifts.map(s => s.id));
+        const newIds = new Set(newShifts.map(s => s.id));
+
         // Mise à jour optimiste immédiate
         setShifts(prev => ({ ...prev, [currentRestaurantId]: newShifts }));
 
         try {
-            const oldIds = new Set(oldShifts.map(s => s.id));
-            const newIds = new Set(newShifts.map(s => s.id));
-
-            // Suppressions
-            const deleted = oldShifts.filter(s => !newIds.has(s.id));
-            if (deleted.length > 0) {
-                await supabase.from('shifts')
-                    .delete()
-                    .in('id', deleted.map(s => s.id));
+            // 1. Suppressions
+            const deletedIds = oldShifts.filter(s => !newIds.has(s.id)).map(s => s.id);
+            if (deletedIds.length > 0) {
+                await supabase.from('shifts').delete().in('id', deletedIds);
             }
 
-            // Ajouts et modifications
-            for (const s of newShifts) {
-                const isNew = !oldIds.has(s.id);
-                const payload = {
-                    restaurant_id: currentRestaurantId,
-                    employee_id: s.employeeId || null,
-                    date: s.date,
-                    start_time: s.startTime,
-                    end_time: s.endTime,
-                    note: s.note || '',
-                };
+            // 2. Upserts (neuf ou modifié)
+            const toUpsert = newShifts.filter(s => {
+                const isNew = !oldIds.has(s.id) || s.id > 1000000;
+                if (isNew) return true;
 
-                if (isNew) {
-                    const { data, error } = await supabase.from('shifts').insert([payload]).select();
-                    if (!error && data?.[0]) {
-                        // Mettre à jour l'id local avec l'id réel de Supabase
-                        setShifts(prev => {
-                            const updated = (prev[currentRestaurantId] || []).map(shift =>
-                                shift.id === s.id ? { ...shift, id: data[0].id } : shift
-                            );
-                            return { ...prev, [currentRestaurantId]: updated };
-                        });
-                    }
-                } else {
-                    await supabase.from('shifts').update(payload).eq('id', s.id);
-                }
+                const o = oldShifts.find(os => os.id === s.id);
+                if (!o) return true;
+
+                return o.employeeId !== s.employeeId || 
+                       o.date !== s.date || 
+                       o.startTime !== s.startTime || 
+                       o.endTime !== s.endTime || 
+                       o.note !== s.note ||
+                       o.status !== s.status;
+            }).map(s => ({
+                id: oldIds.has(s.id) ? s.id : undefined,
+                restaurant_id: currentRestaurantId,
+                employee_id: s.employeeId || null,
+                date: s.date,
+                start_time: s.startTime,
+                end_time: s.endTime,
+                note: s.note || '',
+                status: s.status || 'assigned'
+            }));
+
+            if (toUpsert.length > 0) {
+                const { error } = await supabase.from('shifts').upsert(toUpsert);
+                if (error) throw error;
             }
+
+            // Refresh silencieux pour garantir la cohérence (IDs finaux, etc)
+            fetchData(true);
+
         } catch (error) {
-            console.error('Erreur updateShifts Supabase:', error);
+            console.error('Erreur updateShifts optimisé:', error);
         }
     };
 

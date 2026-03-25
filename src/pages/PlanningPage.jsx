@@ -278,7 +278,7 @@ const PlanningPage = () => {
             ));
         } else {
             // Create new shift
-            const newId = Math.max(...currentShifts.map(s => s.id), 0) + 1;
+            const newId = Date.now();
             updateShifts([...currentShifts, {
                 id: newId,
                 employeeId: isVacant ? null : parseInt(shiftFormData.employeeId),
