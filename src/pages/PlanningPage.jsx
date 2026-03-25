@@ -457,13 +457,33 @@ const PlanningPage = () => {
                                     </div>
                                     
                                     {(emp.pendingRepos?.length > 0 || emp.pendingIndispo?.length > 0) && (
-                                        <div className="pending-requests-inline">
+                                        <div className="pending-requests-container">
                                             {[...(emp.pendingRepos || []), ...(emp.pendingIndispo || [])].map(avail => (
-                                                <div key={avail.id} className="pending-request-item">
-                                                    <span>{avail.type === 'repos' ? '🛌' : '🚫'} {avail.date}</span>
-                                                    <div className="pending-actions">
-                                                        <button onClick={() => approveAvailability(avail.id)}>✅</button>
-                                                        <button onClick={() => rejectAvailability(avail.id)}>❌</button>
+                                                <div key={avail.id} className={`pending-request-card type-${avail.type}`}>
+                                                    <div className="request-info">
+                                                        <div className="request-type-icon">
+                                                            {avail.type === 'repos' ? <Moon size={14} /> : <X size={14} />}
+                                                        </div>
+                                                        <div className="request-details">
+                                                            <span className="request-label">{avail.type === 'repos' ? 'Repos' : 'Indisponible'}</span>
+                                                            <span className="request-date">{avail.date}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="request-actions">
+                                                        <button 
+                                                            className="action-btn approve" 
+                                                            onClick={() => approveAvailability(avail.id)}
+                                                            title="Accepter"
+                                                        >
+                                                            <Icons.Check size={14} />
+                                                        </button>
+                                                        <button 
+                                                            className="action-btn reject" 
+                                                            onClick={() => rejectAvailability(avail.id)}
+                                                            title="Refuser"
+                                                        >
+                                                            <Icons.Close size={14} />
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))}
