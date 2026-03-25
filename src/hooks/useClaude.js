@@ -140,7 +140,8 @@ export const useClaude = () => {
                     historique_n1: {
                         ca_annuel: currentRestaurant?.revenueN1 + '€',
                         rmo_moyen: currentRestaurant?.rmoN1 + '%',
-                        total_couverts: currentRestaurant?.customersN1
+                        total_couverts: currentRestaurant?.customersN1,
+                        cout_salarial: currentRestaurant?.salaryCostN1 + '€'
                     }
                 }
             };

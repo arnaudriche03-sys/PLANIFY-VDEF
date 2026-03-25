@@ -58,7 +58,8 @@ export const DataProvider = ({ children }) => {
                 averageTicket: r.average_ticket || 25,
                 revenueN1: r.revenue_n1 || 0,
                 rmoN1: r.rmo_n1 || 0,
-                customersN1: r.customers_n1 || 0
+                customersN1: r.customers_n1 || 0,
+                salaryCostN1: r.salary_cost_n1 || 0
             })));
 
 

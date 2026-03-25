@@ -30,7 +30,8 @@ const RestaurantModal = ({ onClose, mode }) => {
                 averageTicket: currentRestaurant.averageTicket || 25,
                 revenueN1: currentRestaurant.revenueN1 || 0,
                 rmoN1: currentRestaurant.rmoN1 || 0,
-                customersN1: currentRestaurant.customersN1 || 0
+                customersN1: currentRestaurant.customersN1 || 0,
+                salaryCostN1: currentRestaurant.salaryCostN1 || 0
             };
         }
         return { 
@@ -48,7 +49,8 @@ const RestaurantModal = ({ onClose, mode }) => {
             averageTicket: 25,
             revenueN1: 0,
             rmoN1: 0,
-            customersN1: 0
+            customersN1: 0,
+            salaryCostN1: 0
         };
     });
 
@@ -76,7 +78,8 @@ const RestaurantModal = ({ onClose, mode }) => {
                 averageTicket: Number(formData.averageTicket),
                 revenueN1: Number(formData.revenueN1),
                 rmoN1: Number(formData.rmoN1),
-                customersN1: Number(formData.customersN1)
+                customersN1: Number(formData.customersN1),
+                salaryCostN1: Number(formData.salaryCostN1)
             };
             updateRestaurants([...restaurants, newRestaurant]);
             setCurrentRestaurantId(newId);
@@ -98,7 +101,8 @@ const RestaurantModal = ({ onClose, mode }) => {
                     averageTicket: Number(formData.averageTicket),
                     revenueN1: Number(formData.revenueN1),
                     rmoN1: Number(formData.rmoN1),
-                    customersN1: Number(formData.customersN1)
+                    customersN1: Number(formData.customersN1),
+                    salaryCostN1: Number(formData.salaryCostN1)
                 } : r
             );
 
@@ -118,7 +122,8 @@ const RestaurantModal = ({ onClose, mode }) => {
                 average_ticket: Number(formData.averageTicket),
                 revenue_n1: Number(formData.revenueN1),
                 rmo_n1: Number(formData.rmoN1),
-                customers_n1: Number(formData.customersN1)
+                customers_n1: Number(formData.customersN1),
+                salary_cost_n1: Number(formData.salaryCostN1)
             };
 
             updateRestaurants(updatedRestaurants, payload);
@@ -296,6 +301,16 @@ const RestaurantModal = ({ onClose, mode }) => {
                                     className="form-input"
                                     value={formData.customersN1}
                                     onChange={(e) => setFormData({ ...formData, customersN1: e.target.value })}
+                                    style={{ fontSize: '0.8rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.7rem' }}>Coût Salaire N-1</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={formData.salaryCostN1}
+                                    onChange={(e) => setFormData({ ...formData, salaryCostN1: e.target.value })}
                                     style={{ fontSize: '0.8rem' }}
                                 />
                             </div>
