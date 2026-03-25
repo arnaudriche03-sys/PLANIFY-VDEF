@@ -48,12 +48,17 @@ export const DataProvider = ({ children }) => {
                 id: r.id,
                 name: r.name,
                 address: r.address,
-                openingTime: r.opening_time || '09:00',
-                closingTime: r.closing_time || '23:00',
-                openingTimeWeekend: r.opening_time_weekend || '09:00',
                 closingTimeWeekend: r.closing_time_weekend || '23:00',
                 nightBonusPct: r.night_bonus_pct !== undefined ? r.night_bonus_pct : 10,
-                sundayBonusPct: r.sunday_bonus_pct !== undefined ? r.sunday_bonus_pct : 10
+                sundayBonusPct: r.sunday_bonus_pct !== undefined ? r.sunday_bonus_pct : 10,
+                // ADN & Historique
+                establishmentType: r.establishment_type || 'bistro',
+                targetRmo: r.target_rmo || 30,
+                targetProductivity: r.target_productivity || 80,
+                averageTicket: r.average_ticket || 25,
+                revenueN1: r.revenue_n1 || 0,
+                rmoN1: r.rmo_n1 || 0,
+                customersN1: r.customers_n1 || 0
             })));
 
 

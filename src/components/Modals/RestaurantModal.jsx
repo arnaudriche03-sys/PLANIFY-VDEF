@@ -22,7 +22,15 @@ const RestaurantModal = ({ onClose, mode }) => {
                 openingTimeWeekend: currentRestaurant.openingTimeWeekend || '09:00',
                 closingTimeWeekend: currentRestaurant.closingTimeWeekend || '23:00',
                 nightBonusPct: currentRestaurant.nightBonusPct !== undefined ? currentRestaurant.nightBonusPct : 10,
-                sundayBonusPct: currentRestaurant.sundayBonusPct !== undefined ? currentRestaurant.sundayBonusPct : 10
+                sundayBonusPct: currentRestaurant.sundayBonusPct !== undefined ? currentRestaurant.sundayBonusPct : 10,
+                // ADN & Historique
+                establishmentType: currentRestaurant.establishmentType || 'bistro',
+                targetRmo: currentRestaurant.targetRmo || 30,
+                targetProductivity: currentRestaurant.targetProductivity || 80,
+                averageTicket: currentRestaurant.averageTicket || 25,
+                revenueN1: currentRestaurant.revenueN1 || 0,
+                rmoN1: currentRestaurant.rmoN1 || 0,
+                customersN1: currentRestaurant.customersN1 || 0
             };
         }
         return { 
@@ -33,7 +41,14 @@ const RestaurantModal = ({ onClose, mode }) => {
             openingTimeWeekend: '09:00',
             closingTimeWeekend: '23:00',
             nightBonusPct: 10,
-            sundayBonusPct: 10
+            sundayBonusPct: 10,
+            establishmentType: 'bistro',
+            targetRmo: 30,
+            targetProductivity: 80,
+            averageTicket: 25,
+            revenueN1: 0,
+            rmoN1: 0,
+            customersN1: 0
         };
     });
 
@@ -54,7 +69,14 @@ const RestaurantModal = ({ onClose, mode }) => {
                 openingTimeWeekend: formData.openingTimeWeekend,
                 closingTimeWeekend: formData.closingTimeWeekend,
                 nightBonusPct: Number(formData.nightBonusPct),
-                sundayBonusPct: Number(formData.sundayBonusPct)
+                sundayBonusPct: Number(formData.sundayBonusPct),
+                establishmentType: formData.establishmentType,
+                targetRmo: Number(formData.targetRmo),
+                targetProductivity: Number(formData.targetProductivity),
+                averageTicket: Number(formData.averageTicket),
+                revenueN1: Number(formData.revenueN1),
+                rmoN1: Number(formData.rmoN1),
+                customersN1: Number(formData.customersN1)
             };
             updateRestaurants([...restaurants, newRestaurant]);
             setCurrentRestaurantId(newId);
@@ -69,7 +91,14 @@ const RestaurantModal = ({ onClose, mode }) => {
                     openingTimeWeekend: formData.openingTimeWeekend,
                     closingTimeWeekend: formData.closingTimeWeekend,
                     nightBonusPct: Number(formData.nightBonusPct),
-                    sundayBonusPct: Number(formData.sundayBonusPct)
+                    sundayBonusPct: Number(formData.sundayBonusPct),
+                    establishmentType: formData.establishmentType,
+                    targetRmo: Number(formData.targetRmo),
+                    targetProductivity: Number(formData.targetProductivity),
+                    averageTicket: Number(formData.averageTicket),
+                    revenueN1: Number(formData.revenueN1),
+                    rmoN1: Number(formData.rmoN1),
+                    customersN1: Number(formData.customersN1)
                 } : r
             );
 
@@ -82,7 +111,14 @@ const RestaurantModal = ({ onClose, mode }) => {
                 opening_time_weekend: formData.openingTimeWeekend,
                 closing_time_weekend: formData.closingTimeWeekend,
                 night_bonus_pct: Number(formData.nightBonusPct),
-                sunday_bonus_pct: Number(formData.sundayBonusPct)
+                sunday_bonus_pct: Number(formData.sundayBonusPct),
+                establishment_type: formData.establishmentType,
+                target_rmo: Number(formData.targetRmo),
+                target_productivity: Number(formData.targetProductivity),
+                average_ticket: Number(formData.averageTicket),
+                revenue_n1: Number(formData.revenueN1),
+                rmo_n1: Number(formData.rmoN1),
+                customers_n1: Number(formData.customersN1)
             };
 
             updateRestaurants(updatedRestaurants, payload);
@@ -176,6 +212,91 @@ const RestaurantModal = ({ onClose, mode }) => {
                                     className="form-input"
                                     value={formData.closingTimeWeekend}
                                     onChange={(e) => setFormData({ ...formData, closingTimeWeekend: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ padding: '12px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.1)', marginBottom: '16px' }}>
+                        <label style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600, display: 'block', marginBottom: '12px' }}>ADN du Concept</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '12px' }}>
+                            <div>
+                                <label style={{ fontSize: '0.75rem' }}>Type d'établissement</label>
+                                <select 
+                                    className="form-input"
+                                    value={formData.establishmentType}
+                                    onChange={(e) => setFormData({ ...formData, establishmentType: e.target.value })}
+                                >
+                                    <option value="bistro">Bistro / Brasserie</option>
+                                    <option value="gastro">Gastronomique</option>
+                                    <option value="fastfood">Restauration Rapide</option>
+                                    <option value="bar">Bar / Pub</option>
+                                    <option value="bakery">Boulangerie / Pâtisserie</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.75rem' }}>Ticket Moyen (€)</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={formData.averageTicket}
+                                    onChange={(e) => setFormData({ ...formData, averageTicket: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                                <label style={{ fontSize: '0.75rem' }}>Objectif RMO (%)</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={formData.targetRmo}
+                                    onChange={(e) => setFormData({ ...formData, targetRmo: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.75rem' }}>Prod. Horaire (€/h)</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={formData.targetProductivity}
+                                    onChange={(e) => setFormData({ ...formData, targetProductivity: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)', marginBottom: '16px' }}>
+                        <label style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: '12px' }}>Historique de Référence (N-1)</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                            <div>
+                                <label style={{ fontSize: '0.7rem' }}>CA N-1 (€)</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={formData.revenueN1}
+                                    onChange={(e) => setFormData({ ...formData, revenueN1: e.target.value })}
+                                    style={{ fontSize: '0.8rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.7rem' }}>RMO N-1 (%)</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={formData.rmoN1}
+                                    onChange={(e) => setFormData({ ...formData, rmoN1: e.target.value })}
+                                    style={{ fontSize: '0.8rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.7rem' }}>Couverts N-1</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={formData.customersN1}
+                                    onChange={(e) => setFormData({ ...formData, customersN1: e.target.value })}
+                                    style={{ fontSize: '0.8rem' }}
                                 />
                             </div>
                         </div>

@@ -132,6 +132,17 @@ export const useClaude = () => {
                     const rmo = currentWeekCoutTotal > 0 ? Math.round((currentWeekCoutTotal / ca) * 1000) / 10 : null;
                     return { ca_previsionnel: `${ca}€`, rmo: rmo !== null ? `${rmo}%` : 'non calculable' };
                 })(),
+                profil_restaurant: {
+                    type: currentRestaurant?.establishmentType,
+                    objectif_rmo: currentRestaurant?.targetRmo + '%',
+                    objectif_productivite: currentRestaurant?.targetProductivity + '€/h',
+                    ticket_moyen: currentRestaurant?.averageTicket + '€',
+                    historique_n1: {
+                        ca_annuel: currentRestaurant?.revenueN1 + '€',
+                        rmo_moyen: currentRestaurant?.rmoN1 + '%',
+                        total_couverts: currentRestaurant?.customersN1
+                    }
+                }
             };
             return context;
         } catch (err) {
